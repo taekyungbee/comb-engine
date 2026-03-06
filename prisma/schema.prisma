@@ -1,0 +1,121 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// =============================================
+// 데이터 소스 설정
+// =============================================
+
+model CollectorSource {
+  id         String     @id @default(uuid()) @db.Uuid
+  name       String     @db.VarChar(200)
+  type       SourceType
+  url        String?    @db.VarChar(2000)
+  config     Json       @default("{}")
+  cronExpr   String?    @map("cron_expr") @db.VarChar(50)
+  enabled    Boolean    @default(true)
+  tags       String[]   @default([])
+  lastRunAt  DateTime?  @map("last_run_at")
+  lastStatus RunStatus? @map("last_status")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  runs      CollectionRun[]
+  documents Document[]
+
+  @@index([type])
+  @@index([enabled])
+  @@map("collector_sources")
+}
+
+enum SourceType {
+  WEB_CRAWL
+  YOUTUBE_CHANNEL
+  RSS_FEED
+  GITHUB_REPO
+  DOCUMENT_FILE
+  NOTION_PAGE
+}
+
+// =============================================
+// 수집 실행 이력
+// =============================================
+
+model CollectionRun {
+  id           String    @id @default(uuid()) @db.Uuid
+  sourceId     String    @map("source_id") @db.Uuid
+  status       RunStatus @default(RUNNING)
+  itemsFound   Int       @default(0) @map("items_found")
+  itemsNew     Int       @default(0) @map("items_new")
+  itemsUpdated Int       @default(0) @map("items_updated")
+  itemsSkipped Int       @default(0) @map("items_skipped")
+  errorMessage String?   @map("error_message") @db.Text
+  startedAt    DateTime  @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+
+  source CollectorSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([startedAt(sort: Desc)])
+  @@map("collection_runs")
+}
+
+enum RunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+// =============================================
+// 문서 + 청크 (RAG 저장소)
+// =============================================
+
+model Document {
+  id          String     @id @default(uuid()) @db.Uuid
+  sourceId    String     @map("source_id") @db.Uuid
+  sourceType  SourceType @map("source_type")
+  externalId  String?    @map("external_id") @db.VarChar(500)
+  url         String?    @db.VarChar(2000)
+  title       String     @db.VarChar(1000)
+  content     String     @db.Text
+  contentHash String     @map("content_hash") @db.VarChar(64)
+  summary     String?    @db.Text
+  metadata    Json       @default("{}")
+  tags        String[]   @default([])
+  publishedAt DateTime?  @map("published_at")
+  collectedAt DateTime   @default(now()) @map("collected_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  source CollectorSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  chunks DocumentChunk[]
+
+  @@unique([sourceId, externalId])
+  @@index([sourceType])
+  @@index([contentHash])
+  @@index([publishedAt(sort: Desc)])
+  @@index([collectedAt(sort: Desc)])
+  @@map("documents")
+}
+
+/// embedding 컬럼은 pgvector raw SQL로 관리
+model DocumentChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  content    String   @db.Text
+  chunkIndex Int      @map("chunk_index")
+  tokenCount Int?     @map("token_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("document_chunks")
+}
