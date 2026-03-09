@@ -58,3 +58,9 @@ export interface NotionPageConfig {
   pageId: string;
   recursive?: boolean;
 }
+
+export interface MoltbookConfig {
+  submolts?: string[];
+  maxResults?: number;
+  translate?: boolean;
+}

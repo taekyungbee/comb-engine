@@ -42,6 +42,7 @@ enum SourceType {
   GITHUB_REPO
   DOCUMENT_FILE
   NOTION_PAGE
+  MOLTBOOK
 }
 
 // =============================================

@@ -6,6 +6,7 @@ import { YouTubeCollector } from './youtube-collector';
 import { GitHubCollector } from './github-collector';
 import { NotionCollector } from './notion-collector';
 import { DocumentCollector } from './document-collector';
+import { MoltbookCollector } from './moltbook-collector';
 
 const collectors = new Map<SourceType, Collector>();
 
@@ -20,6 +21,7 @@ register(new YouTubeCollector());
 register(new GitHubCollector());
 register(new NotionCollector());
 register(new DocumentCollector());
+register(new MoltbookCollector());
 
 export function getCollector(type: SourceType): Collector {
   const collector = collectors.get(type);

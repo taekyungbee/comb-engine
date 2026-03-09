@@ -1,6 +1,8 @@
 import type { CollectorSource } from '@prisma/client';
 import { BaseCollector } from './base-collector';
 import type { CollectedItem, WebCrawlConfig } from './types';
+import { translateAndSummarize } from '@/lib/llm';
+import { sleep } from '@/lib/ai-core';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 
@@ -14,12 +16,39 @@ export class WebCrawlCollector extends BaseCollector {
   protected async doCollect(source: CollectorSource): Promise<CollectedItem[]> {
     if (!source.url) throw new Error('URL is required for web crawling');
 
-    const config = source.config as unknown as WebCrawlConfig;
+    const config = source.config as unknown as WebCrawlConfig & { translate?: boolean };
     const visited = new Set<string>();
     const items: CollectedItem[] = [];
     const maxDepth = config?.maxDepth ?? 0;
 
     await this.crawlPage(source.url, config, visited, items, 0, maxDepth);
+
+    // LLM 번역/요약 (옵션)
+    if (config?.translate !== false) {
+      for (const item of items) {
+        const translated = await translateAndSummarize(
+          item.title,
+          item.content,
+          `Web/${new URL(source.url).hostname}`,
+        );
+
+        if (translated) {
+          item.metadata = {
+            ...item.metadata as Record<string, unknown>,
+            originalTitle: item.title,
+            originalContent: item.content,
+            category: translated.category,
+            importance: translated.importance,
+          };
+          item.title = translated.titleKo;
+          item.content = translated.contentKo;
+          item.summary = translated.summary;
+          item.tags = [...(item.tags ?? []), translated.category];
+        }
+
+        await sleep(500);
+      }
+    }
 
     return items;
   }
