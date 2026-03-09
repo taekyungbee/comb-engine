@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 11008",
+    "dev": "next dev -p 11009",
     "build": "next build",
-    "start": "next start -p 11008",
+    "start": "next start -p 11009",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "db:push": "prisma db push",
