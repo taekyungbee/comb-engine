@@ -11,6 +11,7 @@ export interface SearchResult {
   title: string;
   url: string | null;
   publishedAt: string | null;
+  collectionId: string | null;
 }
 
 export interface SearchOptions {
@@ -18,13 +19,14 @@ export interface SearchOptions {
   threshold?: number;
   sourceTypes?: SourceType[];
   tags?: string[];
+  collectionIds?: string[];
 }
 
 export async function searchSimilar(
   query: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
-  const { limit = 10, threshold = 0.6, sourceTypes, tags } = options;
+  const { limit = 10, threshold = 0.6, sourceTypes, tags, collectionIds } = options;
 
   const provider = getEmbeddingProvider();
   const embedding = await provider.embed(query);
@@ -45,6 +47,12 @@ export async function searchSimilar(
     params.push(tags);
   }
 
+  if (collectionIds && collectionIds.length > 0) {
+    const placeholders = collectionIds.map(() => `$${paramIndex++}`).join(', ');
+    whereClause += ` AND d.collection_id IN (${placeholders})`;
+    params.push(...collectionIds);
+  }
+
   params.push(limit);
 
   const results = await prisma.$queryRawUnsafe<SearchResult[]>(
@@ -57,7 +65,8 @@ export async function searchSimilar(
       d.source_type as "sourceType",
       d.title,
       d.url,
-      d.published_at as "publishedAt"
+      d.published_at as "publishedAt",
+      d.collection_id as "collectionId"
     FROM document_chunks dc
     JOIN documents d ON dc.document_id = d.id
     WHERE ${whereClause}

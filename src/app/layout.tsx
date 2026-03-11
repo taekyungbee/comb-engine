@@ -20,7 +20,10 @@ export default function RootLayout({
             <NavLink href="/" label="Dashboard" />
             <NavLink href="/sources" label="Sources" />
             <NavLink href="/search" label="Search" />
-            <NavLink href="/collections" label="Collections" />
+            <NavLink href="/collections" label="History" />
+            <NavLink href="/my-collections" label="Collections" />
+            <NavLink href="/api-keys" label="API Keys" />
+            <NavLink href="/settings" label="Settings" />
           </nav>
           <main className="flex-1 p-6 bg-gray-50 dark:bg-gray-950">
             {children}

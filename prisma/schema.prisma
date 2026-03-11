@@ -6,7 +6,75 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  extensions = [vector]
+  extensions = [vector, pgcrypto(map: "pgcrypto")]
+}
+
+// =============================================
+// 사용자 및 인증
+// =============================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(100)
+  role         UserRole @default(MEMBER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  apiKeys     ApiKey[]
+  collections Collection[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model ApiKey {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  name      String    @db.VarChar(100)
+  keyHash   String    @unique @map("key_hash") @db.VarChar(64)
+  keyPrefix String    @map("key_prefix") @db.VarChar(8)
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt DateTime?  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+// =============================================
+// 컬렉션 (문서 그룹)
+// =============================================
+
+model Collection {
+  id          String               @id @default(uuid()) @db.Uuid
+  name        String               @db.VarChar(200)
+  description String?              @db.Text
+  visibility  CollectionVisibility @default(PRIVATE)
+  ownerId     String               @map("owner_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([ownerId])
+  @@index([visibility])
+  @@map("collections")
+}
+
+enum CollectionVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
 }
 
 // =============================================
@@ -43,6 +111,7 @@ enum SourceType {
   DOCUMENT_FILE
   NOTION_PAGE
   MOLTBOOK
+  API_INGEST
 }
 
 // =============================================
@@ -80,33 +149,43 @@ enum RunStatus {
 // =============================================
 
 model Document {
-  id          String     @id @default(uuid()) @db.Uuid
-  sourceId    String     @map("source_id") @db.Uuid
-  sourceType  SourceType @map("source_type")
-  externalId  String?    @map("external_id") @db.VarChar(500)
-  url         String?    @db.VarChar(2000)
-  title       String     @db.VarChar(1000)
-  content     String     @db.Text
-  contentHash String     @map("content_hash") @db.VarChar(64)
-  summary     String?    @db.Text
-  metadata    Json       @default("{}")
-  tags        String[]   @default([])
-  publishedAt DateTime?  @map("published_at")
-  collectedAt DateTime   @default(now()) @map("collected_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  id           String     @id @default(uuid()) @db.Uuid
+  sourceId     String     @map("source_id") @db.Uuid
+  collectionId String?    @map("collection_id") @db.Uuid
+  sourceType   SourceType @map("source_type")
+  contentType  ContentType @default(TEXT) @map("content_type")
+  externalId   String?    @map("external_id") @db.VarChar(500)
+  url          String?    @db.VarChar(2000)
+  title        String     @db.VarChar(1000)
+  content      String     @db.Text
+  contentHash  String     @map("content_hash") @db.VarChar(64)
+  summary      String?    @db.Text
+  metadata     Json       @default("{}")
+  tags         String[]   @default([])
+  publishedAt  DateTime?  @map("published_at")
+  collectedAt  DateTime   @default(now()) @map("collected_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  source CollectorSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  chunks DocumentChunk[]
+  source     CollectorSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  collection Collection?     @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  chunks     DocumentChunk[]
 
   @@unique([sourceId, externalId])
   @@index([sourceType])
+  @@index([contentType])
+  @@index([collectionId])
   @@index([contentHash])
   @@index([publishedAt(sort: Desc)])
   @@index([collectedAt(sort: Desc)])
   @@map("documents")
 }
 
-/// embedding 컬럼은 pgvector raw SQL로 관리
+enum ContentType {
+  TEXT
+  IMAGE
+}
+
+/// embedding 컬럼은 pgvector raw SQL로 관리 (1536차원, gemini-embedding-001)
 model DocumentChunk {
   id         String   @id @default(uuid()) @db.Uuid
   documentId String   @map("document_id") @db.Uuid

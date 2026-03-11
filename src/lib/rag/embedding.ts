@@ -1,38 +1,18 @@
 import { prisma } from '@/lib/prisma';
-import {
-  createEmbeddingProvider,
-  type EmbeddingProvider,
-  type EmbeddingModelType,
-} from '@/lib/ai-core';
+import { getEmbeddingProvider, type EmbeddingProvider } from '@/lib/ai-core';
 
-let embeddingProvider: EmbeddingProvider | null = null;
+export { getEmbeddingProvider };
+export type { EmbeddingProvider };
 
-export function getEmbeddingProvider(): EmbeddingProvider {
-  if (embeddingProvider) return embeddingProvider;
-
-  const providerType = (process.env.EMBEDDING_PROVIDER || 'ollama') as EmbeddingModelType;
-
-  embeddingProvider = createEmbeddingProvider(providerType, {
-    apiKey: process.env.OPENAI_API_KEY,
-    url: process.env.OLLAMA_URL || 'http://192.168.0.67:11434',
-    model: process.env.EMBEDDING_MODEL || 'nomic-embed-text',
-    dimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || '768'),
-  });
-
-  return embeddingProvider;
-}
+const DIMENSIONS = 1536;
 
 export async function initVectorExtension(): Promise<void> {
   await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector');
 
-  const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS || '768');
-
   await prisma.$executeRawUnsafe(`
     ALTER TABLE document_chunks
-    ADD COLUMN IF NOT EXISTS embedding vector(${dimensions})
+    ADD COLUMN IF NOT EXISTS embedding vector(${DIMENSIONS})
   `);
-
-  // IVFFlat 인덱스는 최소 데이터가 있어야 생성 가능 — 데이터 추가 후 별도 호출
 }
 
 export async function createVectorIndex(): Promise<void> {
@@ -68,4 +48,9 @@ export async function embedAndSaveChunks(
   for (let i = 0; i < chunks.length; i++) {
     await saveChunkEmbedding(chunks[i].id, embeddings[i]);
   }
+}
+
+export async function embedImage(imagePath: string): Promise<number[]> {
+  const provider = getEmbeddingProvider();
+  return provider.embedImage(imagePath);
 }

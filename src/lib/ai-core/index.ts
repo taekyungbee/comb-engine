@@ -1,65 +1,86 @@
-// @side/ai-core에서 필요한 부분만 추출 (외부 의존성 제거)
+import { GoogleGenAI } from '@google/genai';
 
 export interface EmbeddingProvider {
   embed(text: string): Promise<number[]>;
   embedBatch(texts: string[]): Promise<number[][]>;
+  embedImage(imagePath: string): Promise<number[]>;
   readonly dimensions: number;
   readonly modelName: string;
 }
 
-export class OllamaEmbeddingProvider implements EmbeddingProvider {
-  private baseUrl: string;
-  readonly dimensions: number;
-  readonly modelName: string;
+export class GeminiEmbeddingProvider implements EmbeddingProvider {
+  private client: GoogleGenAI;
+  readonly dimensions = 1536;
+  readonly modelName = 'gemini-embedding-001';
 
-  constructor(
-    baseUrl: string = 'http://localhost:11434',
-    model: string = 'nomic-embed-text',
-    dimensions: number = 768
-  ) {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.modelName = model;
-    this.dimensions = dimensions;
+  constructor(apiKey: string) {
+    this.client = new GoogleGenAI({ apiKey });
   }
 
   async embed(text: string): Promise<number[]> {
-    const response = await fetch(`${this.baseUrl}/api/embed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: this.modelName, input: text }),
+    const result = await this.client.models.embedContent({
+      model: this.modelName,
+      contents: text,
     });
-    if (!response.ok) throw new Error(`Ollama embedding error: ${response.status}`);
-    const data = await response.json();
-    return data.embeddings[0];
+    return result.embeddings?.[0]?.values ?? [];
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const response = await fetch(`${this.baseUrl}/api/embed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: this.modelName, input: texts }),
+    const BATCH_SIZE = 100;
+    const allEmbeddings: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batch = texts.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (text) => {
+          const result = await this.client.models.embedContent({
+            model: this.modelName,
+            contents: text,
+          });
+          return result.embeddings?.[0]?.values ?? [];
+        })
+      );
+      allEmbeddings.push(...results);
+    }
+
+    return allEmbeddings;
+  }
+
+  async embedImage(imagePath: string): Promise<number[]> {
+    const fs = await import('fs');
+    const path = await import('path');
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64 = imageBuffer.toString('base64');
+    const ext = path.extname(imagePath).toLowerCase().replace('.', '');
+    const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+
+    const result = await this.client.models.embedContent({
+      model: this.modelName,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: base64,
+            },
+          },
+        ],
+      },
     });
-    if (!response.ok) throw new Error(`Ollama embedding error: ${response.status}`);
-    const data = await response.json();
-    return data.embeddings;
+    return result.embeddings?.[0]?.values ?? [];
   }
 }
 
-export type EmbeddingModelType = 'openai' | 'ollama';
+let provider: EmbeddingProvider | null = null;
 
-export function createEmbeddingProvider(
-  type: EmbeddingModelType,
-  config: {
-    apiKey?: string;
-    url?: string;
-    model?: string;
-    dimensions?: number;
-  }
-): EmbeddingProvider {
-  if (type === 'ollama') {
-    return new OllamaEmbeddingProvider(config.url, config.model, config.dimensions);
-  }
-  throw new Error(`Unsupported embedding provider: ${type}. Only ollama is supported in standalone mode.`);
+export function getEmbeddingProvider(): EmbeddingProvider {
+  if (provider) return provider;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
+
+  provider = new GeminiEmbeddingProvider(apiKey);
+  return provider;
 }
 
 export interface TextChunk {

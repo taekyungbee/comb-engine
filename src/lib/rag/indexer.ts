@@ -15,6 +15,7 @@ export interface IndexableItem {
   metadata?: Prisma.InputJsonValue;
   tags?: string[];
   publishedAt?: Date;
+  collectionId?: string;
 }
 
 function computeHash(content: string): string {
@@ -71,6 +72,7 @@ export async function indexItem(item: IndexableItem): Promise<'new' | 'updated' 
       metadata: item.metadata ?? {},
       tags: item.tags ?? [],
       publishedAt: item.publishedAt,
+      collectionId: item.collectionId,
     },
   });
 
