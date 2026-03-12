@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
 export interface EmbeddingProvider {
   embed(text: string): Promise<number[]>;
   embedBatch(texts: string[]): Promise<number[][]>;
@@ -8,21 +6,24 @@ export interface EmbeddingProvider {
   readonly modelName: string;
 }
 
-export class GeminiEmbeddingProvider implements EmbeddingProvider {
-  private client: GoogleGenAI;
-  readonly dimensions = 1536;
-  readonly modelName = 'gemini-embedding-001';
+export class OllamaEmbeddingProvider implements EmbeddingProvider {
+  private baseUrl: string;
+  readonly dimensions = 768;
+  readonly modelName = 'nomic-embed-text';
 
-  constructor(apiKey: string) {
-    this.client = new GoogleGenAI({ apiKey });
+  constructor(baseUrl: string = 'http://192.168.0.81:11434') {
+    this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
   async embed(text: string): Promise<number[]> {
-    const result = await this.client.models.embedContent({
-      model: this.modelName,
-      contents: text,
+    const res = await fetch(`${this.baseUrl}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.modelName, input: text }),
     });
-    return result.embeddings?.[0]?.values ?? [];
+    if (!res.ok) throw new Error(`Ollama embedding error: ${res.status}`);
+    const data = await res.json();
+    return data.embeddings?.[0] ?? [];
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -33,11 +34,14 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
       const batch = texts.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (text) => {
-          const result = await this.client.models.embedContent({
-            model: this.modelName,
-            contents: text,
+          const res = await fetch(`${this.baseUrl}/api/embed`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: this.modelName, input: text }),
           });
-          return result.embeddings?.[0]?.values ?? [];
+          if (!res.ok) return [];
+          const data = await res.json();
+          return data.embeddings?.[0] ?? [];
         })
       );
       allEmbeddings.push(...results);
@@ -47,27 +51,9 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedImage(imagePath: string): Promise<number[]> {
-    const fs = await import('fs');
-    const path = await import('path');
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64 = imageBuffer.toString('base64');
-    const ext = path.extname(imagePath).toLowerCase().replace('.', '');
-    const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-
-    const result = await this.client.models.embedContent({
-      model: this.modelName,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64,
-            },
-          },
-        ],
-      },
-    });
-    return result.embeddings?.[0]?.values ?? [];
+    // Ollama는 이미지 임베딩을 직접 지원하지 않으므로
+    // 일단 dummy 값 반환 (향후 vision 모델 추가 시 구현)
+    return new Array(this.dimensions).fill(0);
   }
 }
 
@@ -76,10 +62,8 @@ let provider: EmbeddingProvider | null = null;
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (provider) return provider;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
-
-  provider = new GeminiEmbeddingProvider(apiKey);
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://192.168.0.81:11434';
+  provider = new OllamaEmbeddingProvider(baseUrl);
   return provider;
 }
 
