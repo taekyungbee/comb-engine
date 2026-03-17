@@ -19,13 +19,20 @@ export interface IndexableItem {
   collectionId?: string;
 }
 
+export interface IndexOptions {
+  /** true면 요약/임베딩을 스킵하고 문서+청크만 저장 (배치 후처리용) */
+  deferAI?: boolean;
+}
+
 function computeHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
 const MIN_CONTENT_LENGTH = 10;
 
-export async function indexItem(item: IndexableItem): Promise<'new' | 'updated' | 'skipped'> {
+export async function indexItem(item: IndexableItem, options: IndexOptions = {}): Promise<'new' | 'updated' | 'skipped'> {
+  const { deferAI = true } = options;
+
   // 쓰레기 데이터 필터링: 10자 미만 콘텐츠 제외
   if (item.content.trim().length < MIN_CONTENT_LENGTH) {
     console.warn(`[Indexer] 콘텐츠 너무 짧아 스킵 (${item.content.trim().length}자): ${item.title}`);
@@ -51,8 +58,10 @@ export async function indexItem(item: IndexableItem): Promise<'new' | 'updated' 
     // 콘텐츠 변경됨 → 기존 청크 삭제 후 재인덱싱
     await prisma.documentChunk.deleteMany({ where: { documentId: existing.id } });
 
-    // V1 요약 생성 (collector가 요약을 제공하지 않은 경우)
-    const summary = item.summary || await generateSummary(item.title, item.content, item.sourceType);
+    // deferAI=false: 동기식 요약 생성
+    const summary = deferAI
+      ? (item.summary || null)
+      : (item.summary || await generateSummary(item.title, item.content, item.sourceType));
 
     await prisma.document.update({
       where: { id: existing.id },
@@ -67,13 +76,21 @@ export async function indexItem(item: IndexableItem): Promise<'new' | 'updated' 
         url: item.url,
       },
     });
-    // 요약이 있으면 요약 기반으로 임베딩 (1회), 없으면 원본으로
-    await createAndEmbedChunks(existing.id, summary || item.content);
+
+    // 청크 생성 (요약 있으면 요약 기반, 없으면 원본)
+    const chunkContent = summary || item.content;
+    if (deferAI) {
+      await createChunksOnly(existing.id, chunkContent);
+    } else {
+      await createAndEmbedChunks(existing.id, chunkContent);
+    }
     return 'updated';
   }
 
-  // V1 요약 생성 (collector가 요약을 제공하지 않은 경우)
-  const summary = item.summary || await generateSummary(item.title, item.content, item.sourceType);
+  // deferAI=false: 동기식 요약 생성
+  const summary = deferAI
+    ? (item.summary || null)
+    : (item.summary || await generateSummary(item.title, item.content, item.sourceType));
 
   // 신규 문서
   const doc = await prisma.document.create({
@@ -93,13 +110,17 @@ export async function indexItem(item: IndexableItem): Promise<'new' | 'updated' 
     },
   });
 
-  // 요약 기반 임베딩 1회 (V0 원본 저장 + V1 요약으로 임베딩)
-  await createAndEmbedChunks(doc.id, summary || item.content);
+  const chunkContent = summary || item.content;
+  if (deferAI) {
+    // 문서 + 청크만 저장 → 요약/임베딩은 배치로 후처리
+    await createChunksOnly(doc.id, chunkContent);
+  } else {
+    await createAndEmbedChunks(doc.id, chunkContent);
+  }
   return 'new';
 }
 
 async function generateSummary(title: string, content: string, sourceType: string): Promise<string | null> {
-  // 짧은 콘텐츠는 요약 불필요
   if (content.length < 200) return null;
 
   try {
@@ -110,6 +131,25 @@ async function generateSummary(title: string, content: string, sourceType: strin
   }
 }
 
+/** 청크만 생성 (임베딩 없이) - 배치 후처리용 */
+async function createChunksOnly(documentId: string, content: string): Promise<void> {
+  const chunks = chunkText(content, { chunkSize: 500, overlap: 50 });
+
+  await Promise.all(
+    chunks.map((chunk) =>
+      prisma.documentChunk.create({
+        data: {
+          documentId,
+          content: chunk.text,
+          chunkIndex: chunk.index,
+          tokenCount: Math.ceil(chunk.text.length / 4),
+        },
+      })
+    )
+  );
+}
+
+/** 청크 생성 + 임베딩 (동기식) */
 async function createAndEmbedChunks(documentId: string, content: string): Promise<void> {
   const chunks = chunkText(content, { chunkSize: 500, overlap: 50 });
 
