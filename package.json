@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "batch:embed": "npx tsx scripts/batch-embed.ts",
     "batch:summarize": "npx tsx scripts/batch-summarize.ts",
-    "migrate:ohub": "npx tsx scripts/migrate-ohub.ts"
+    "migrate:ohub": "npx tsx scripts/migrate-ohub.ts",
+    "chunk:missing": "npx tsx scripts/chunk-missing.ts"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
