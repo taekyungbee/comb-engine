@@ -139,15 +139,21 @@ async function runFile(client: GoogleGenAI, chunks: { id: string; content: strin
   try {
     // JSONL 생성
     const jsonlPath = join(tmpDir, 'embed_requests.jsonl');
-    const lines = chunks.map((chunk) =>
-      JSON.stringify({
+    const lines = chunks.map((chunk) => {
+      const sanitized = chunk.content
+        .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+        .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+      const line = JSON.stringify({
         custom_id: chunk.id,
+        url: '/v1/embeddings',
         body: {
-          model: `models/${EMBEDDING_MODEL}`,
-          content: { parts: [{ text: chunk.content }] },
+          model: EMBEDDING_MODEL,
+          input: sanitized,
         },
-      })
-    );
+      });
+      return line.replace(/\\ud[89a-f][0-9a-f]{2}/gi, '');
+    });
     writeFileSync(jsonlPath, lines.join('\n'), 'utf-8');
     const sizeMB = (Buffer.byteLength(lines.join('\n')) / 1024 / 1024).toFixed(1);
     console.log(`[Batch] JSONL 생성: ${lines.length}건, ${sizeMB}MB`);
@@ -192,7 +198,8 @@ async function runFile(client: GoogleGenAI, chunks: { id: string; content: strin
       const result = JSON.parse(line);
       const idx = idToIndex.get(result.custom_id);
       if (idx !== undefined) {
-        embeddings[idx] = result.response?.body?.embedding?.values ?? null;
+        // OpenAI 호환 형식: response.body.data[0].embedding
+        embeddings[idx] = result.response?.body?.data?.[0]?.embedding ?? result.response?.body?.embedding?.values ?? null;
       }
     }
 

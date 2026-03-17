@@ -178,14 +178,14 @@ async function runFile(client: GoogleGenAI, docs: TargetDoc[]): Promise<number> 
   try {
     // JSONL 생성
     const jsonlPath = join(tmpDir, 'summarize_requests.jsonl');
-    const lines = docs.map((doc, i) => {
+    const lines = docs.map((doc) => {
       const prompt = buildPrompt(
         sanitizeText(doc.title),
         doc.content,  // buildPrompt 안에서 sanitize됨
         doc.source_type,
       );
       const line = JSON.stringify({
-        custom_id: String(i),
+        custom_id: doc.id,
         url: '/v1/chat/completions',
         body: {
           model: SUMMARIZE_MODEL,
@@ -235,12 +235,13 @@ async function runFile(client: GoogleGenAI, docs: TargetDoc[]): Promise<number> 
 
     console.log(`[Batch] ${resultLines.length}건 결과 수신. DB 저장 중...`);
 
+    // custom_id = doc.id 기반으로 매핑
+    const docIdToIndex = new Map(docs.map((d, i) => [d.id, i]));
     const summaries: (string | null)[] = new Array(docs.length).fill(null);
     for (const line of resultLines) {
       const result = JSON.parse(line);
-      const idx = parseInt(result.custom_id, 10);
-      if (!isNaN(idx)) {
-        // OpenAI 호환 형식 응답
+      const idx = docIdToIndex.get(result.custom_id);
+      if (idx !== undefined) {
         summaries[idx] = result.response?.body?.choices?.[0]?.message?.content ?? null;
       }
     }
