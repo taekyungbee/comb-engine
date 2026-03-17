@@ -41,6 +41,7 @@ export async function runCollection(sourceId: string): Promise<string> {
           metadata: item.metadata as Prisma.InputJsonValue,
           tags: item.tags,
           publishedAt: item.publishedAt,
+          projectId: source.projectId ?? undefined,
         });
 
         if (status === 'new') itemsNew++;

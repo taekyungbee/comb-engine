@@ -7,20 +7,21 @@ import { createHash } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
-// API를 통한 수집을 위한 가상 소스 찾기/생성
-async function getApiIngestSource(): Promise<string> {
+// API를 통한 수집을 위한 가상 소스 찾기/생성 (projectId별 분리)
+async function getApiIngestSource(projectId?: string): Promise<string> {
   const existing = await prisma.collectorSource.findFirst({
-    where: { type: 'API_INGEST' },
+    where: { type: 'API_INGEST', projectId: projectId ?? null },
   });
 
   if (existing) return existing.id;
 
   const source = await prisma.collectorSource.create({
     data: {
-      name: 'API Ingest',
+      name: projectId ? `API Ingest (${projectId})` : 'API Ingest',
       type: 'API_INGEST',
       enabled: true,
       config: {},
+      projectId,
     },
   });
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleTextIngest(request: NextRequest, userId: string) {
-  const { title, content, url, tags, collectionId, metadata } = await request.json();
+  const { title, content, url, tags, collectionId, projectId, metadata } = await request.json();
 
   if (!title || !content) {
     return NextResponse.json(
@@ -74,7 +75,7 @@ async function handleTextIngest(request: NextRequest, userId: string) {
     }
   }
 
-  const sourceId = await getApiIngestSource();
+  const sourceId = await getApiIngestSource(projectId);
   const externalId = createHash('sha256').update(`${title}:${Date.now()}`).digest('hex').slice(0, 32);
 
   const result = await indexItem({
@@ -87,6 +88,7 @@ async function handleTextIngest(request: NextRequest, userId: string) {
     tags: tags || [],
     metadata: metadata || {},
     collectionId,
+    projectId,
   });
 
   return NextResponse.json({ success: true, data: { status: result } }, { status: 201 });
@@ -97,6 +99,7 @@ async function handleImageIngest(request: NextRequest, userId: string) {
   const file = formData.get('file') as File | null;
   const title = formData.get('title') as string;
   const collectionId = formData.get('collectionId') as string | null;
+  const projectId = formData.get('projectId') as string | null;
   const tagsRaw = formData.get('tags') as string | null;
 
   if (!file || !title) {
@@ -127,7 +130,7 @@ async function handleImageIngest(request: NextRequest, userId: string) {
   const filePath = path.join(uploadsDir, fileName);
   await writeFile(filePath, buffer);
 
-  const sourceId = await getApiIngestSource();
+  const sourceId = await getApiIngestSource(projectId ?? undefined);
   const contentHash = createHash('sha256').update(buffer).digest('hex');
 
   // Document 생성
@@ -141,6 +144,7 @@ async function handleImageIngest(request: NextRequest, userId: string) {
       content: `[Image: ${file.name}]`,
       contentHash,
       collectionId,
+      projectId,
       tags: tagsRaw ? tagsRaw.split(',').map((t) => t.trim()) : [],
       metadata: { fileName: file.name, filePath, mimeType: file.type, size: file.size },
     },

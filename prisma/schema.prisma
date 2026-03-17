@@ -90,6 +90,7 @@ model CollectorSource {
   cronExpr   String?    @map("cron_expr") @db.VarChar(50)
   enabled    Boolean    @default(true)
   tags       String[]   @default([])
+  projectId  String?    @map("project_id") @db.VarChar(30)
   lastRunAt  DateTime?  @map("last_run_at")
   lastStatus RunStatus? @map("last_status")
   createdAt  DateTime   @default(now()) @map("created_at")
@@ -100,6 +101,7 @@ model CollectorSource {
 
   @@index([type])
   @@index([enabled])
+  @@index([projectId])
   @@map("collector_sources")
 }
 
@@ -157,6 +159,7 @@ model Document {
   id           String     @id @default(uuid()) @db.Uuid
   sourceId     String     @map("source_id") @db.Uuid
   collectionId String?    @map("collection_id") @db.Uuid
+  projectId    String?    @map("project_id") @db.VarChar(30)
   sourceType   SourceType @map("source_type")
   contentType  ContentType @default(TEXT) @map("content_type")
   externalId   String?    @map("external_id") @db.VarChar(500)
@@ -179,6 +182,7 @@ model Document {
   @@index([sourceType])
   @@index([contentType])
   @@index([collectionId])
+  @@index([projectId])
   @@index([contentHash])
   @@index([publishedAt(sort: Desc)])
   @@index([collectedAt(sort: Desc)])

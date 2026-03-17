@@ -17,6 +17,7 @@ export interface IndexableItem {
   tags?: string[];
   publishedAt?: Date;
   collectionId?: string;
+  projectId?: string;
 }
 
 export interface IndexOptions {
@@ -74,6 +75,7 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
         tags: item.tags ?? [],
         publishedAt: item.publishedAt,
         url: item.url,
+        projectId: item.projectId,
       },
     });
 
@@ -107,6 +109,7 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
       tags: item.tags ?? [],
       publishedAt: item.publishedAt,
       collectionId: item.collectionId,
+      projectId: item.projectId,
     },
   });
 
@@ -171,12 +174,17 @@ async function createAndEmbedChunks(documentId: string, content: string): Promis
   );
 }
 
-export async function getIndexStats() {
+export async function getIndexStats(projectId?: string) {
+  const docFilter = projectId ? { projectId } : {};
+
   const [documentCount, chunkCount, sourceBreakdown] = await Promise.all([
-    prisma.document.count(),
-    prisma.documentChunk.count(),
+    prisma.document.count({ where: docFilter }),
+    prisma.documentChunk.count({
+      where: projectId ? { document: { projectId } } : undefined,
+    }),
     prisma.document.groupBy({
       by: ['sourceType'],
+      where: docFilter,
       _count: { id: true },
     }),
   ]);

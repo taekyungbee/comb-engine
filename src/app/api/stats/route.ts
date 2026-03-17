@@ -1,13 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getIndexStats } from '@/services/search.service';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const projectId = request.nextUrl.searchParams.get('projectId') ?? undefined;
+    const projectFilter = projectId ? { projectId } : {};
+
     const [indexStats, sourceCount, recentRuns] = await Promise.all([
-      getIndexStats(),
-      prisma.collectorSource.count(),
+      getIndexStats(projectId),
+      prisma.collectorSource.count({ where: projectFilter }),
       prisma.collectionRun.findMany({
+        where: projectId ? { source: { projectId } } : undefined,
         orderBy: { startedAt: 'desc' },
         take: 10,
         include: { source: { select: { name: true, type: true } } },

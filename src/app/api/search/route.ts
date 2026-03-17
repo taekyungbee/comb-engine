@@ -4,7 +4,7 @@ import { searchSimilar } from '@/services/search.service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, limit, threshold, sourceTypes, tags } = body;
+    const { query, limit, threshold, sourceTypes, tags, projectId, collectionIds } = body;
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = await searchSimilar(query, { limit, threshold, sourceTypes, tags });
+    const results = await searchSimilar(query, { limit, threshold, sourceTypes, tags, projectId, collectionIds });
     return NextResponse.json({ success: true, data: { results, count: results.length } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

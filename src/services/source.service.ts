@@ -10,6 +10,7 @@ interface CreateSourceInput {
   cronExpr?: string;
   enabled?: boolean;
   tags?: string[];
+  projectId?: string;
 }
 
 interface UpdateSourceInput {
@@ -21,8 +22,9 @@ interface UpdateSourceInput {
   tags?: string[];
 }
 
-export async function listSources() {
+export async function listSources(projectId?: string) {
   return prisma.collectorSource.findMany({
+    where: projectId ? { projectId } : undefined,
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { documents: true, runs: true } },
@@ -53,6 +55,7 @@ export async function createSource(input: CreateSourceInput) {
       cronExpr: input.cronExpr,
       enabled: input.enabled ?? true,
       tags: input.tags ?? [],
+      projectId: input.projectId,
     },
   });
 
