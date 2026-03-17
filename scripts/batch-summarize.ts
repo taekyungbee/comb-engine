@@ -74,10 +74,21 @@ async function getTargetDocs(args: Args): Promise<TargetDoc[]> {
   `);
 }
 
+/** 깨진 유니코드, 서로게이트 쌍, 제어 문자 제거 */
+function sanitizeText(text: string): string {
+  return text
+    // 홀로 남은 서로게이트 쌍 제거
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+    // 널 바이트 및 제어 문자 제거 (탭/줄바꿈 제외)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+
 function buildPrompt(title: string, content: string, sourceType: string): string {
-  const truncated = content.length > MAX_CONTENT_LENGTH
-    ? content.slice(0, MAX_CONTENT_LENGTH) + '...'
-    : content;
+  const sanitized = sanitizeText(content);
+  const truncated = sanitized.length > MAX_CONTENT_LENGTH
+    ? sanitized.slice(0, MAX_CONTENT_LENGTH) + '...'
+    : sanitized;
 
   return `다음 문서를 요약해주세요.
 
@@ -167,21 +178,28 @@ async function runFile(client: GoogleGenAI, docs: TargetDoc[]): Promise<number> 
   try {
     // JSONL 생성
     const jsonlPath = join(tmpDir, 'summarize_requests.jsonl');
-    const lines = docs.map((doc, i) =>
-      JSON.stringify({
+    const lines = docs.map((doc, i) => {
+      const prompt = buildPrompt(
+        sanitizeText(doc.title),
+        doc.content,  // buildPrompt 안에서 sanitize됨
+        doc.source_type,
+      );
+      const line = JSON.stringify({
         custom_id: String(i),
+        url: '/v1/chat/completions',
         body: {
-          model: `models/${SUMMARIZE_MODEL}`,
-          contents: [{
-            parts: [{ text: buildPrompt(doc.title, doc.content, doc.source_type) }],
-          }],
-          systemInstruction: {
-            parts: [{ text: '당신은 기술 문서를 요약하는 전문가입니다. 핵심 내용만 정확하고 간결하게 요약하세요.' }],
-          },
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+          model: SUMMARIZE_MODEL,
+          messages: [
+            { role: 'system', content: '당신은 기술 문서를 요약하는 전문가입니다. 핵심 내용만 정확하고 간결하게 요약하세요.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 1024,
         },
-      })
-    );
+      });
+      // JSON 직렬화 후에도 남아있을 수 있는 서로게이트 제거
+      return line.replace(/\\ud[89a-f][0-9a-f]{2}/gi, '');
+    });
     writeFileSync(jsonlPath, lines.join('\n'), 'utf-8');
     const sizeMB = (Buffer.byteLength(lines.join('\n')) / 1024 / 1024).toFixed(1);
     console.log(`[Batch] JSONL 생성: ${lines.length}건, ${sizeMB}MB`);
@@ -222,7 +240,8 @@ async function runFile(client: GoogleGenAI, docs: TargetDoc[]): Promise<number> 
       const result = JSON.parse(line);
       const idx = parseInt(result.custom_id, 10);
       if (!isNaN(idx)) {
-        summaries[idx] = result.response?.body?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+        // OpenAI 호환 형식 응답
+        summaries[idx] = result.response?.body?.choices?.[0]?.message?.content ?? null;
       }
     }
 
