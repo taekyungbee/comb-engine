@@ -55,12 +55,20 @@ export class GitCloneCollector extends BaseCollector {
     const items: CollectedItem[] = [];
 
     try {
-      // git clone (shallow)
+      // git clone (shallow) - GitHub 토큰 인증 지원
       const cloneArgs = ['clone', '--depth', '1'];
       if (config.branch) {
         cloneArgs.push('--branch', config.branch);
       }
-      cloneArgs.push(config.gitUrl, tmpDir);
+
+      // 프라이빗 레포: GITHUB_TOKEN으로 인증 URL 생성
+      let cloneUrl = config.gitUrl;
+      const githubToken = process.env.GITHUB_TOKEN;
+      if (githubToken && cloneUrl.includes('github.com')) {
+        cloneUrl = cloneUrl.replace('https://github.com', `https://${githubToken}@github.com`);
+      }
+
+      cloneArgs.push(cloneUrl, tmpDir);
 
       console.log(`[GitClone] Cloning ${config.gitUrl}...`);
       await execFileAsync('git', cloneArgs, { timeout: 300_000 });
