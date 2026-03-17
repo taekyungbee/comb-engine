@@ -20,8 +20,11 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# pnpm install 재확인 (prisma 빌드 바이너리 다운로드)
+RUN pnpm install
+
 # Prisma 클라이언트 생성
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 # Next.js 빌드
 ENV NEXT_TELEMETRY_DISABLED=1

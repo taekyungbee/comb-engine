@@ -51,7 +51,12 @@ export interface GitHubRepoConfig {
 
 export interface DocumentFileConfig {
   filePath: string;
-  fileType: 'pdf' | 'md' | 'txt';
+  fileType: 'pdf' | 'md' | 'txt' | 'pptx' | 'ppt' | 'xlsx' | 'xls' | 'docx' | 'doc' | 'odp' | 'ods' | 'odt' | 'rtf' | 'csv';
+}
+
+export interface GoogleWorkspaceConfig {
+  fileId: string;
+  fileType: 'document' | 'spreadsheet' | 'presentation';
 }
 
 export interface NotionPageConfig {
@@ -63,4 +68,30 @@ export interface MoltbookConfig {
   submolts?: string[];
   maxResults?: number;
   translate?: boolean;
+}
+
+export interface GmailConfig {
+  query: string;
+  maxResults?: number;
+}
+
+export interface GoogleCalendarConfig {
+  calendarId?: string;
+  daysBack?: number;
+  daysForward?: number;
+}
+
+export interface GoogleChatConfig {
+  spaceId: string;
+  maxResults?: number;
+  daysBack?: number;
+}
+
+export interface GitCloneConfig {
+  gitUrl: string;
+  branch?: string;
+  paths?: string[];
+  extensions?: string[];
+  maxFileSize?: number;
+  includeTests?: boolean;
 }

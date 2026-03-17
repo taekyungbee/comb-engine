@@ -4,7 +4,7 @@ import { getEmbeddingProvider, type EmbeddingProvider } from '@/lib/ai-core';
 export { getEmbeddingProvider };
 export type { EmbeddingProvider };
 
-const DIMENSIONS = 1536;
+const DIMENSIONS = 3072;
 
 export async function initVectorExtension(): Promise<void> {
   await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector');

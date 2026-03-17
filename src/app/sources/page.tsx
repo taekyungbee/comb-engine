@@ -20,8 +20,14 @@ const SOURCE_TYPES = [
   'YOUTUBE_CHANNEL',
   'RSS_FEED',
   'GITHUB_REPO',
+  'GIT_CLONE',
   'DOCUMENT_FILE',
+  'GOOGLE_WORKSPACE',
+  'GMAIL',
+  'GOOGLE_CALENDAR',
+  'GOOGLE_CHAT',
   'NOTION_PAGE',
+  'MOLTBOOK',
 ] as const;
 
 export default function SourcesPage() {

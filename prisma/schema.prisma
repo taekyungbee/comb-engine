@@ -109,8 +109,13 @@ enum SourceType {
   RSS_FEED
   GITHUB_REPO
   DOCUMENT_FILE
+  GOOGLE_WORKSPACE
   NOTION_PAGE
   MOLTBOOK
+  GMAIL
+  GOOGLE_CALENDAR
+  GOOGLE_CHAT
+  GIT_CLONE
   API_INGEST
 }
 
@@ -185,7 +190,7 @@ enum ContentType {
   IMAGE
 }
 
-/// embedding 컬럼은 pgvector raw SQL로 관리 (1536차원, gemini-embedding-001)
+/// embedding 컬럼은 pgvector raw SQL로 관리 (3072차원, gemini-embedding-2-preview)
 model DocumentChunk {
   id         String   @id @default(uuid()) @db.Uuid
   documentId String   @map("document_id") @db.Uuid

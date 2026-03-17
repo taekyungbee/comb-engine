@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, signToken } from '@/lib/auth';
+import { hashPassword, signToken, generateApiKey, hashApiKey } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +34,18 @@ export async function POST(request: NextRequest) {
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
-    return NextResponse.json({ success: true, data: { user, token } }, { status: 201 });
+    // API Key 자동 발급
+    const { key: apiKey, prefix } = generateApiKey();
+    await prisma.apiKey.create({
+      data: {
+        userId: user.id,
+        name: 'default',
+        keyHash: hashApiKey(apiKey),
+        keyPrefix: prefix,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: { user, token, apiKey } }, { status: 201 });
   } catch (error) {
     console.error('Register error:', error);
     return NextResponse.json(

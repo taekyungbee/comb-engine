@@ -6,24 +6,34 @@ export interface EmbeddingProvider {
   readonly modelName: string;
 }
 
-export class OllamaEmbeddingProvider implements EmbeddingProvider {
-  private baseUrl: string;
-  readonly dimensions = 768;
-  readonly modelName = 'nomic-embed-text';
+export class GeminiEmbeddingProvider implements EmbeddingProvider {
+  private apiKey: string;
+  readonly dimensions = 3072;
+  readonly modelName = 'gemini-embedding-2-preview';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
 
-  constructor(baseUrl: string = 'http://192.168.0.81:11434') {
-    this.baseUrl = baseUrl.replace(/\/$/, '');
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
   }
 
   async embed(text: string): Promise<number[]> {
-    const res = await fetch(`${this.baseUrl}/api/embed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: this.modelName, input: text }),
-    });
-    if (!res.ok) throw new Error(`Ollama embedding error: ${res.status}`);
+    const res = await fetch(
+      `${this.baseUrl}/models/${this.modelName}:embedContent?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: `models/${this.modelName}`,
+          content: { parts: [{ text }] },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gemini embedding error: ${res.status} ${err}`);
+    }
     const data = await res.json();
-    return data.embeddings?.[0] ?? [];
+    return data.embedding?.values ?? [];
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -32,28 +42,61 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(async (text) => {
-          const res = await fetch(`${this.baseUrl}/api/embed`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: this.modelName, input: text }),
-          });
-          if (!res.ok) return [];
-          const data = await res.json();
-          return data.embeddings?.[0] ?? [];
-        })
+      const requests = batch.map((text) => ({
+        model: `models/${this.modelName}`,
+        content: { parts: [{ text }] },
+      }));
+
+      const res = await fetch(
+        `${this.baseUrl}/models/${this.modelName}:batchEmbedContents?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests }),
+        },
       );
-      allEmbeddings.push(...results);
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Gemini batch embedding error: ${res.status} ${err}`);
+      }
+
+      const data = await res.json();
+      const embeddings = (data.embeddings ?? []).map(
+        (e: { values: number[] }) => e.values,
+      );
+      allEmbeddings.push(...embeddings);
     }
 
     return allEmbeddings;
   }
 
   async embedImage(imagePath: string): Promise<number[]> {
-    // Ollama는 이미지 임베딩을 직접 지원하지 않으므로
-    // 일단 dummy 값 반환 (향후 vision 모델 추가 시 구현)
-    return new Array(this.dimensions).fill(0);
+    const fs = await import('fs');
+    const imageBytes = fs.readFileSync(imagePath);
+    const base64 = imageBytes.toString('base64');
+    const ext = imagePath.split('.').pop()?.toLowerCase() || 'png';
+    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+
+    const res = await fetch(
+      `${this.baseUrl}/models/${this.modelName}:embedContent?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: `models/${this.modelName}`,
+          content: {
+            parts: [{ inline_data: { mime_type: mimeType, data: base64 } }],
+          },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gemini image embedding error: ${res.status} ${err}`);
+    }
+    const data = await res.json();
+    return data.embedding?.values ?? [];
   }
 }
 
@@ -62,8 +105,11 @@ let provider: EmbeddingProvider | null = null;
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (provider) return provider;
 
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://192.168.0.81:11434';
-  provider = new OllamaEmbeddingProvider(baseUrl);
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
+  if (!apiKey) {
+    throw new Error('GOOGLE_API_KEY 또는 GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
+  }
+  provider = new GeminiEmbeddingProvider(apiKey);
   return provider;
 }
 
@@ -89,7 +135,7 @@ export function chunkText(
     index++;
   }
 
-  return chunks.filter((c) => c.text.length > 0);
+  return chunks.filter((c) => c.text.length >= 10);
 }
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
