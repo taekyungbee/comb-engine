@@ -1,76 +1,97 @@
-# rag-collector + outsource-hub 작업 목록
+# rag-collector 작업 목록
 
-## rag-collector 작업
+## 역할 정의
 
-### 1. Git clone 수집기
-- 현재: 로컬 경로 기반 (`/home/user/komca-source/src`)
-- 변경: Git URL 입력 → `git clone` → 분석 → 정리
-- 소스 연결 시 Git 주소만 넣으면 되도록
+```
+rag-collector (192.168.0.67:11009, 내부 전용)
+├── 데이터 수집 (12종 수집기 + cron 스케줄)
+├── AI 요약 (gemini-3.1-flash-lite-preview)
+├── 임베딩 (gemini-embedding-2-preview, 3072차원)
+├── 벡터 저장/검색 (pgvector)
+└── API: /api/ingest, /api/search, /api/stats
 
-### 2. PPT 멀티모달 수집
-- 현재: PPT 텍스트 추출 → 쓰레기 데이터 ("공연 - 무대공연" 수준)
-- 변경: PPT → 슬라이드별 이미지 변환 → Gemini 멀티모달 분석/요약
-- 화면설계서의 레이아웃, 테이블, 다이어그램 내용을 제대로 추출
-- outsource-hub KOMCA 기준 437건 슬라이드 문서 존재
+outsource-hub (outsource.lazyb.xyz, 외부 공개)
+├── MCP 서버 (팀원 접근, rag_search/rag_ingest → rag-collector API)
+├── Knowledge API (엔티티, 매핑, 영향도 분석)
+├── 비교분석/산출물 생성 (gemini-3.1-pro-preview)
+├── 챗봇
+└── DB: portfolio_rag (documents, comparisons, data_sources)
+```
 
-### 3. summarizer 이관
-- outsource-hub의 `src/services/summarizer.ts` → rag-collector로 이동
-- 모델: `gemini-3.1-flash-lite-preview` (배치/자동 요약)
-- 수집 시 V0 → 바로 V1 요약 생성 → 임베딩 1회로 끝내기
+## 현황 (2026-03-17)
 
-### 4. 수집 파이프라인 통합
-- 순서: 수집 → Knowledge 엔티티 생성 → AI 요약(V1) → 임베딩
-- 임베딩은 V1 완료 후 1회만 (현재는 V0 임베딩 → V1 후 재임베딩으로 2회)
-- Gemini API: embedding은 `gemini-embedding-2-preview` (3072차원)
+### rag-collector (rag_collector DB)
+- 문서: 149,820건 | 청크: 350,402건 (전부 임베딩 완료)
+- 소스: 57개 (KOMCA Git 50 + 테스트 7)
+- Qdrant → pgvector 마이그레이션 완료 (115,636건)
+- PPT 멀티모달 수집 완료 (419장 Gemini Vision)
 
-### 5. MCP 구조 정리 ✅
-- MCP 서버는 outsource-hub에 유지 (도메인 있음, 팀원 접근)
-- outsource-hub MCP에 RAG 툴 추가 (search, ingest → rag-collector 내부 API 호출)
-- rag-collector는 순수 API 서비스 (MCP 없음, 내부 IP만)
+### outsource-hub (portfolio_rag DB)
+- 문서: 16,339건 (청크 0 — Qdrant에만 있었음)
+- 비교분석: 973건 (품질 낮음, 재생성 필요)
+- 데이터 소스: 15개 (AS-IS 8,360 / TO-BE 7,979)
+- 검색: Qdrant 의존 (115,642건)
 
-### 6. 쓰레기 데이터 필터링
-- content 10자 미만 엔티티 수집 단계에서 제외
-- 빈 PPT 슬라이드 (제목없음 + 내용 한 줄) 필터링
-- DTO/VO 등 로직 없는 단순 클래스는 요약 생략 or 간소화
+### 불일치 문제
+1. **outsource-hub 검색이 Qdrant 의존** — rag-collector pgvector로 전환 필요
+2. **portfolio_rag.document_chunks = 0건** — 청크가 Qdrant에만 있었음
+3. **데이터 중복** — portfolio_rag 16,339건 + rag_collector 149,820건 (일부 겹침)
+4. **대시보드 0건 표시** — 소스별 문서 수가 outsource-hub 기준이라 rag-collector 데이터 미반영
 
 ---
 
-## outsource-hub 작업
+## 완료된 작업 ✅
 
-### 1. 배포
-- Coolify 수동 배포 (API 토큰 만료됨, 갱신 필요)
-- 대시보드: http://192.168.0.67:8000
-- 앱 UUID: u88s4s0kcwwwcw4wkgcccwg0
+### 1. Git clone 수집기 ✅
+### 2. PPT 멀티모달 수집 ✅
+### 3. summarizer 이관 ✅
+### 4. 수집 파이프라인 통합 ✅ (배치 모드 기본)
+### 5. MCP 구조 정리 ✅
+### 6. 쓰레기 데이터 필터링 ✅
+### 7. Qdrant → pgvector 마이그레이션 ✅
+### 8. KOMCA 초기 적재 ✅ (50개 레포, 33,755건)
+### 9. 배치 스크립트 ✅ (summarize, embed, sync-embed, migrate-qdrant, ppt-multimodal)
 
-### 2. 비교분석 재생성
-- 기존 973건이 로컬 LLM(gemma/qwen)으로 생성 → 품질 낮음
+---
+
+## 남은 작업
+
+### 1. 프로젝트 모델 + 자동 등록/스케줄
+- 프로젝트 생성 시 GitHub 조직 / 파일 디렉토리 일괄 등록
+- 소스 자동 등록 + cron 스케줄 자동 설정
+- 초기 적재 자동 파이프라인 (수집 → 배치 요약 → 임베딩)
+- 프로젝트 단위 관리 vs 개인 인사이트 구분
+
+### 2. outsource-hub 검색 전환
+- outsource-hub 검색을 Qdrant → rag-collector API로 전환
+- `src/services/search.service.ts`: Qdrant → rag-collector `/api/search` 호출
+- `src/lib/qdrant.ts` 제거
+- 대시보드에서 rag-collector 통계 표시
+
+### 3. portfolio_rag ↔ rag_collector 데이터 통합
+- portfolio_rag의 documents 16,339건 중 rag_collector에 없는 것 이관
+- 비교분석(comparisons) 973건은 outsource-hub 고유 → 유지
+- data_sources 15개 → rag-collector collector_sources로 매핑
+
+### 4. Qdrant 컨테이너 제거
+- outsource-hub 검색 전환 완료 후
+- Qdrant 컨테이너 정지 및 제거
+- 메모리 확보
+
+### 5. 비교분석 재생성
+- 기존 973건: 로컬 LLM(gemma/qwen)으로 생성 → 품질 낮음
 - Gemini 3.1 Pro로 재분석 필요
-- TODO, 깨진 마크다운 테이블 등 개선
 
-### 3. 실패 문서 121건 재적재
-- doc reembed 시 400 에러 (Gemini 임베딩 8192 토큰 초과)
-- 청크 크기 줄여서 재시도
-
-### 4. Qdrant 정리
-- `outsource-hub` 컬렉션 324,612건 — 용도 확인 후 삭제
-- `komca` 컬렉션: 114,920 벡터 (3072차원, 정상)
-
-### 5. Coolify API 토큰 갱신
-- 현재 토큰 `s4oc0cgc44w4o0owg4wcg0g00ow4k0408co4go0c` 만료
+### 6. Docker 네트워크 영구 설정
+- rag-pgvector를 coolify 네트워크에 영구 연결
+- 컨테이너 재시작 시 연결 끊김 방지
 
 ---
 
 ## Gemini API 모델 정리
 
-| 용도 | 모델명 | 가격 (1M 토큰) |
-|------|--------|---------------|
-| 챗봇/비교분석/산출물 | `gemini-3.1-pro-preview` | $1.25 / $10.00 |
-| 요약 배치 | `gemini-3.1-flash-lite-preview` | $0.25 / $1.50 |
-| 임베딩 | `gemini-embedding-2-preview` | $0.006 |
-
-## 인프라 현황
-
-- **Gemini API**: Tier 1 (RPM 150~300)
-- **Qdrant**: 192.168.0.67:6333 (komca 컬렉션 3072차원)
-- **Ollama**: 192.168.0.81:11434 (폴백용, gemma3:27b/12b)
-- **DB**: PostgreSQL 192.168.0.67:5433
+| 용도 | 모델명 | 가격 (1M 토큰) | 사용처 |
+|------|--------|---------------|--------|
+| 비교분석/산출물 | `gemini-3.1-pro-preview` | $1.25 / $10.00 | outsource-hub |
+| 요약 배치 | `gemini-3.1-flash-lite-preview` | $0.25 / $1.50 | rag-collector |
+| 임베딩 | `gemini-embedding-2-preview` | $0.006 | rag-collector |
