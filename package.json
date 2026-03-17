@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "batch:embed": "npx tsx scripts/batch-embed.ts",
-    "batch:summarize": "npx tsx scripts/batch-summarize.ts"
+    "batch:summarize": "npx tsx scripts/batch-summarize.ts",
+    "migrate:ohub": "npx tsx scripts/migrate-ohub.ts"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",

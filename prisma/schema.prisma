@@ -119,6 +119,11 @@ enum SourceType {
   GOOGLE_CHAT
   GIT_CLONE
   API_INGEST
+  ORACLE_SCHEMA
+  JAVA_SOURCE
+  XML_UI
+  FRONTEND_SOURCE
+  DOCUMENT
 }
 
 // =============================================
