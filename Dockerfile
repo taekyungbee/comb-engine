@@ -34,6 +34,9 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# git (GIT_CLONE 수집기), libreoffice (PPT 멀티모달)
+RUN apk add --no-cache git libreoffice poppler-utils
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
