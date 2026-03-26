@@ -131,9 +131,9 @@ export async function searchSimilar(
 
   const results: SearchResult[] = reranked.map((point) => ({
     chunkId: (point.payload.chunk_id as string) || String(point.id),
-    documentId: '',
+    documentId: (point.payload.document_id as string) || '',
     content: sanitize((point.payload.content as string) || ''),
-    similarity: point.score,
+    similarity: Math.min(1, Math.max(0, point.score)),
     sourceType: (point.payload.source_type as string) || '',
     title: (point.payload.title as string) || '',
     url: null,
