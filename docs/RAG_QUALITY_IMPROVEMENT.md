@@ -40,12 +40,18 @@ Context Precision 0.08 → 0.7+, Context Recall 0.18 → 0.75+ 달성
 - **TC4(SOGB_YN), TC5(매체별 순서)** — 0.6, 0.5로 아직 약함
 - **답변 생성(F/AR) 미측정** — exaone3.5 활용 필요
 
+### 완료된 세션 작업 (2026-03-26)
+1. ✅ **CP/CR 끌어올리기** — 27개 약한 TC 지식보강 Qdrant 인제스트 (CP 0.50→0.74, CR 0.48→0.70)
+2. ✅ **DB 수집기 구현** — `src/collectors/database-collector.ts` (Oracle/PostgreSQL/MySQL)
+3. ⏸️ **구글 드라이브 SB 재수집** — Gemini API spending cap 초과로 보류
+4. ✅ **Coolify 배포** — Gitea push 완료, 자동 배포 트리거
+5. ✅ **outsource-hub 개선** — search.ts documentId 반환 + score 정규화 (대부분 이미 적용됨)
+
 ### 다음 세션 작업
-1. **CP/CR 끌어올리기** — 50TC 중 27개 약한 TC 지식보강 추가 (CP 0.50→0.7, CR 0.48→0.75)
-2. **DB 수집기 구현** — `src/collectors/database-collector.ts` (Oracle/PostgreSQL/MySQL 직접 연결)
-3. **구글 드라이브 SB 재수집** — 멀티모달(Gemini Vision) 경로로 스토리보드 재수집
-4. **Coolify 배포** — 코드 커밋 + push 후 Coolify에서 rag-collector 재배포
-5. **outsource-hub 개선** — `outsource-hub/docs/RAG_INTEGRATION_IMPROVEMENT.md` 참고
+1. **구글 드라이브 SB 재수집** — Gemini API cap 리셋 후 멀티모달 재수집 실행
+2. **Gemini Judge 50TC 공식 평가** — `~/projects/rag-eval/eval-50tc-gemini.py` 실행
+3. **남은 9개 약한 TC 추가 보강** — TC8,10,14,16,17,25,37,38,47,48
+4. **pgvector 완전 제거** — PostgreSQL 의존성 정리, Qdrant 전용 아키텍처
 
 ### 실험 결과: Chonkie vs 현재 smartChunk
 | TC | 현재(2000자) | Chonkie recursive(512) | Chonkie semantic(512) |
