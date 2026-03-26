@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { getQdrantClient, getCollectionName, textToSparse } from '@/lib/qdrant';
 import { getEmbeddingProvider } from './embedding';
 import type { SourceType } from '@prisma/client';
 
@@ -28,61 +28,167 @@ export async function searchSimilar(
   query: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
-  const { limit = 10, threshold = 0.6, sourceTypes, tags, collectionIds, projectId } = options;
+  const { limit = 10, threshold = 0.3, sourceTypes, projectId } = options;
+  const qdrant = getQdrantClient();
+  const collection = getCollectionName();
 
+  // bge-m3 임베딩
   const provider = getEmbeddingProvider();
-  const embedding = await provider.embed(query);
-  const vectorStr = `[${embedding.join(',')}]`;
+  const queryVector = await provider.embed(query);
 
-  let whereClause = `dc.embedding IS NOT NULL AND 1 - (dc.embedding <=> $1::vector) >= $2`;
-  const params: unknown[] = [vectorStr, threshold];
-  let paramIndex = 3;
+  // Sparse vector
+  const sparse = textToSparse(query);
 
+  // 키워드 식별자 추출 (KOMCA-1796, TENV_SVCCD 등)
+  const identifiers = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+
+  // 필터 조건
+  const mustConditions: Array<Record<string, unknown>> = [];
   if (sourceTypes && sourceTypes.length > 0) {
-    const placeholders = sourceTypes.map(() => `$${paramIndex++}`).join(', ');
-    whereClause += ` AND d.source_type IN (${placeholders})`;
-    params.push(...sourceTypes);
+    mustConditions.push({
+      key: 'source_type',
+      match: { any: sourceTypes },
+    });
   }
-
-  if (tags && tags.length > 0) {
-    whereClause += ` AND d.tags && $${paramIndex++}::text[]`;
-    params.push(tags);
-  }
-
-  if (collectionIds && collectionIds.length > 0) {
-    const placeholders = collectionIds.map(() => `$${paramIndex++}`).join(', ');
-    whereClause += ` AND d.collection_id IN (${placeholders})`;
-    params.push(...collectionIds);
-  }
-
   if (projectId) {
-    whereClause += ` AND d.project_id = $${paramIndex++}`;
-    params.push(projectId);
+    mustConditions.push({
+      key: 'project_id',
+      match: { value: projectId },
+    });
+  }
+  const filter = mustConditions.length > 0 ? { must: mustConditions } : undefined;
+
+  // Dense top-20 + Sparse top-20 → RRF fusion
+  const prefetch = [
+    {
+      query: queryVector,
+      using: 'dense' as const,
+      limit: 20,
+      ...(filter ? { filter } : {}),
+    },
+    {
+      query: sparse,
+      using: 'text' as const,
+      limit: 20,
+      ...(filter ? { filter } : {}),
+    },
+  ];
+
+  const hybridResults = await qdrant.query(collection, {
+    prefetch,
+    query: { fusion: 'rrf' as const },
+    limit: limit * 2, // reranker 전 후보
+    with_payload: true,
+  });
+
+  // Keyword filter 결과 추가 (식별자 정확 매칭)
+  const keywordPoints: Array<{ id: string | number; score: number; payload?: Record<string, unknown> | null }> = [];
+  for (const ident of identifiers) {
+    try {
+      const scrollResult = await qdrant.scroll(collection, {
+        filter: {
+          must: [{ key: 'title', match: { text: ident } }],
+        },
+        limit: 5,
+        with_payload: true,
+      });
+      keywordPoints.push(...scrollResult.points.map((p) => ({ ...p, score: 0.5 })));
+    } catch {
+      // 필터 검색 실패 무시
+    }
   }
 
-  params.push(limit);
+  // 합집합 (중복 제거)
+  const seenIds = new Set<string | number>();
+  const combined: CandidatePoint[] = [];
 
-  const results = await prisma.$queryRawUnsafe<SearchResult[]>(
-    `
-    SELECT
-      dc.id as "chunkId",
-      dc.document_id as "documentId",
-      dc.content,
-      1 - (dc.embedding <=> $1::vector) as similarity,
-      d.source_type as "sourceType",
-      d.title,
-      d.url,
-      d.published_at as "publishedAt",
-      d.collection_id as "collectionId",
-      d.project_id as "projectId"
-    FROM document_chunks dc
-    JOIN documents d ON dc.document_id = d.id
-    WHERE ${whereClause}
-    ORDER BY dc.embedding <=> $1::vector
-    LIMIT $${paramIndex}
-    `,
-    ...params
-  );
+  for (const p of hybridResults.points) {
+    if (!seenIds.has(p.id)) {
+      seenIds.add(p.id);
+      combined.push({
+        id: p.id,
+        score: p.score ?? 0,
+        payload: (p.payload ?? {}) as Record<string, unknown>,
+      });
+    }
+  }
+  for (const p of keywordPoints) {
+    if (!seenIds.has(p.id)) {
+      seenIds.add(p.id);
+      combined.push({
+        id: p.id,
+        score: p.score,
+        payload: (p.payload ?? {}) as Record<string, unknown>,
+      });
+    }
+  }
 
-  return results;
+  // Reranker로 최종 순위 결정
+  const reranked = await rerank(query, combined, limit);
+
+  // SearchResult로 변환 (제어 문자 제거)
+  const sanitize = (s: string) => s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+
+  const results: SearchResult[] = reranked.map((point) => ({
+    chunkId: (point.payload.chunk_id as string) || String(point.id),
+    documentId: '',
+    content: sanitize((point.payload.content as string) || ''),
+    similarity: point.score,
+    sourceType: (point.payload.source_type as string) || '',
+    title: (point.payload.title as string) || '',
+    url: null,
+    publishedAt: null,
+    collectionId: null,
+    projectId: (point.payload.project_id as string) || null,
+  }));
+
+  return results.filter((r) => r.similarity >= threshold || identifiers.length > 0);
+}
+
+// ── Reranker (bge-reranker-v2-m3 서비스) ──
+
+const RERANKER_URL = process.env.RERANKER_URL || 'http://localhost:10800';
+
+interface CandidatePoint {
+  id: string | number;
+  score: number;
+  payload: Record<string, unknown>;
+}
+
+async function rerank(
+  query: string,
+  candidates: CandidatePoint[],
+  topK: number
+): Promise<CandidatePoint[]> {
+  if (candidates.length === 0) return [];
+
+  try {
+    const documents = candidates.map(
+      (c) => ((c.payload.content as string) || '').slice(0, 2000)
+    );
+
+    const resp = await fetch(`${RERANKER_URL}/rerank`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, documents, top_k: topK }),
+    });
+
+    if (!resp.ok) {
+      console.warn(`[Search] Reranker 실패 (${resp.status}), hybrid 점수 사용`);
+      return candidates.slice(0, topK);
+    }
+
+    const data = (await resp.json()) as {
+      results: Array<{ index: number; score: number }>;
+    };
+
+    return data.results.map((r) => ({
+      ...candidates[r.index],
+      score: r.score,
+    }));
+  } catch {
+    // Reranker 서비스 다운 시 fallback: hybrid 점수 그대로
+    console.warn('[Search] Reranker 서비스 연결 실패, hybrid 점수 사용');
+    return candidates.slice(0, topK);
+  }
 }

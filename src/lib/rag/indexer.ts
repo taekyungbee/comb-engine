@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma';
-import { chunkText } from '@/lib/ai-core';
-import { embedAndSaveChunks } from './embedding';
+import { smartChunk, type SourceType as RagSourceType } from '@side/rag-core';
+import { getEmbeddingProvider } from './embedding';
 import { summarizeContent } from '@/lib/llm';
 import { createHash } from 'crypto';
+import { getQdrantClient, getCollectionName, textToSparse } from '@/lib/qdrant';
 import type { SourceType, Prisma } from '@prisma/client';
 
 export interface IndexableItem {
@@ -30,6 +31,26 @@ function computeHash(content: string): string {
 }
 
 const MIN_CONTENT_LENGTH = 10;
+
+/** Prisma SourceType → rag-core SourceType 매핑 */
+function toRagSourceType(sourceType: SourceType): RagSourceType {
+  const map: Record<string, RagSourceType> = {
+    WEB_CRAWL: 'WEB_CRAWL',
+    YOUTUBE_CHANNEL: 'YOUTUBE',
+    RSS_FEED: 'RSS_FEED',
+    GITHUB_REPO: 'GITHUB_REPO',
+    DOCUMENT_FILE: 'DOCUMENT',
+    GOOGLE_WORKSPACE: 'DOCUMENT',
+    NOTION_PAGE: 'DOCUMENT',
+    MOLTBOOK: 'DOCUMENT',
+    GMAIL: 'DOCUMENT',
+    GOOGLE_CALENDAR: 'GENERIC',
+    GOOGLE_CHAT: 'GENERIC',
+    GIT_CLONE: 'GITHUB_REPO',
+    API_INGEST: 'API_INGEST',
+  };
+  return map[sourceType] ?? 'GENERIC';
+}
 
 export async function indexItem(item: IndexableItem, options: IndexOptions = {}): Promise<'new' | 'updated' | 'skipped'> {
   const { deferAI = true } = options;
@@ -82,9 +103,9 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
     // 청크 생성 (요약 있으면 요약 기반, 없으면 원본)
     const chunkContent = summary || item.content;
     if (deferAI) {
-      await createChunksOnly(existing.id, chunkContent);
+      await createChunksOnly(existing.id, chunkContent, item.sourceType);
     } else {
-      await createAndEmbedChunks(existing.id, chunkContent);
+      await createAndEmbedChunks(existing.id, chunkContent, item.sourceType);
     }
     return 'updated';
   }
@@ -116,9 +137,9 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
   const chunkContent = summary || item.content;
   if (deferAI) {
     // 문서 + 청크만 저장 → 요약/임베딩은 배치로 후처리
-    await createChunksOnly(doc.id, chunkContent);
+    await createChunksOnly(doc.id, chunkContent, item.sourceType);
   } else {
-    await createAndEmbedChunks(doc.id, chunkContent);
+    await createAndEmbedChunks(doc.id, chunkContent, item.sourceType);
   }
   return 'new';
 }
@@ -135,8 +156,11 @@ async function generateSummary(title: string, content: string, sourceType: strin
 }
 
 /** 청크만 생성 (임베딩 없이) - 배치 후처리용 */
-async function createChunksOnly(documentId: string, content: string): Promise<void> {
-  const chunks = chunkText(content, { chunkSize: 500, overlap: 50 });
+async function createChunksOnly(documentId: string, content: string, sourceType: SourceType): Promise<void> {
+  const ragSourceType = toRagSourceType(sourceType);
+  const chunks = smartChunk(content, { sourceType: ragSourceType });
+
+  console.log(`[Indexer] smartChunk(${ragSourceType}): ${content.length}자 → ${chunks.length}개 청크`);
 
   await Promise.all(
     chunks.map((chunk) =>
@@ -152,9 +176,12 @@ async function createChunksOnly(documentId: string, content: string): Promise<vo
   );
 }
 
-/** 청크 생성 + 임베딩 (동기식) */
-async function createAndEmbedChunks(documentId: string, content: string): Promise<void> {
-  const chunks = chunkText(content, { chunkSize: 500, overlap: 50 });
+/** 청크 생성 + 임베딩 + Qdrant 적재 (동기식) */
+async function createAndEmbedChunks(documentId: string, content: string, sourceType: SourceType, title?: string): Promise<void> {
+  const ragSourceType = toRagSourceType(sourceType);
+  const chunks = smartChunk(content, { sourceType: ragSourceType });
+
+  console.log(`[Indexer] smartChunk(${ragSourceType}): ${content.length}자 → ${chunks.length}개 청크`);
 
   const createdChunks = await Promise.all(
     chunks.map((chunk) =>
@@ -169,9 +196,42 @@ async function createAndEmbedChunks(documentId: string, content: string): Promis
     )
   );
 
-  await embedAndSaveChunks(
-    createdChunks.map((c) => ({ id: c.id, text: c.content }))
-  );
+  // bge-m3 임베딩
+  const provider = getEmbeddingProvider();
+  const texts = createdChunks.map((c) => c.content);
+  const embeddings = await provider.embedBatch(texts);
+
+  // Qdrant 적재
+  try {
+    const qdrant = getQdrantClient();
+    const collection = getCollectionName();
+
+    // 현재 포인트 수로 ID 생성
+    const info = await qdrant.getCollection(collection);
+    const baseId = info.points_count ?? 0;
+
+    const points = createdChunks.map((chunk, i) => ({
+      id: baseId + i,
+      vector: {
+        dense: embeddings[i],
+        text: textToSparse(chunk.content),
+      },
+      payload: {
+        chunk_id: chunk.id,
+        content: chunk.content,
+        title: title || '',
+        source_type: sourceType,
+        document_id: documentId,
+      },
+    }));
+
+    await qdrant.upsert(collection, { points });
+    console.log(`[Indexer] Qdrant 적재: ${points.length}개`);
+  } catch (error) {
+    console.error(`[Indexer] Qdrant 적재 실패:`, error);
+    // Qdrant 실패해도 pgvector에는 저장됨
+  }
+
 }
 
 export async function getIndexStats(projectId?: string) {

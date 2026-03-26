@@ -100,17 +100,60 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+export class OllamaEmbeddingProvider implements EmbeddingProvider {
+  readonly dimensions = 1024;
+  readonly modelName = 'bge-m3';
+  private baseUrl: string;
+
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const res = await fetch(`${this.baseUrl}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.modelName, input: text }),
+    });
+    if (!res.ok) throw new Error(`Ollama embed error: ${res.status}`);
+    const data = await res.json();
+    return data.embeddings[0];
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    const res = await fetch(`${this.baseUrl}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.modelName, input: texts }),
+    });
+    if (!res.ok) throw new Error(`Ollama embedBatch error: ${res.status}`);
+    const data = await res.json();
+    return data.embeddings;
+  }
+
+  async embedImage(_imagePath: string): Promise<number[]> {
+    throw new Error('Ollama nomic-embed-text는 이미지 임베딩을 지원하지 않습니다. Gemini를 사용하세요.');
+  }
+}
+
 let provider: EmbeddingProvider | null = null;
 
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (provider) return provider;
 
+  // 텍스트 임베딩: Ollama nomic-embed-text (로컬, 768d)
+  // 이미지 임베딩: getImageEmbeddingProvider() 사용
+  provider = new OllamaEmbeddingProvider();
+  return provider;
+}
+
+/** 이미지 전용 Gemini 임베딩 프로바이더 */
+export function getImageEmbeddingProvider(): EmbeddingProvider {
   const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
   if (!apiKey) {
-    throw new Error('GOOGLE_API_KEY 또는 GEMINI_API_KEY 환경변수가 설정되지 않았습니다.');
+    throw new Error('이미지 임베딩에는 GEMINI_API_KEY가 필요합니다.');
   }
-  provider = new GeminiEmbeddingProvider(apiKey);
-  return provider;
+  return new GeminiEmbeddingProvider(apiKey);
 }
 
 export interface TextChunk {

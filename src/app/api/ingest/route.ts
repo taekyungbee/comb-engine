@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest, requireRole, AuthError } from '@/lib/auth';
 import { indexItem } from '@/lib/rag/indexer';
-import { embedImage, saveChunkEmbedding } from '@/lib/rag/embedding';
+import { embedImage } from '@/lib/rag/embedding';
 import { createHash } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
@@ -163,7 +163,13 @@ async function handleImageIngest(request: NextRequest, userId: string) {
     },
   });
 
-  await saveChunkEmbedding(chunk.id, embedding);
+  // 이미지 임베딩은 Gemini 3072d — 별도 Qdrant 컬렉션 필요 (TODO)
+  const vectorStr = `[${embedding.join(',')}]`;
+  await prisma.$executeRawUnsafe(
+    `UPDATE document_chunks SET embedding = $1::vector WHERE id = $2::uuid`,
+    vectorStr,
+    chunk.id
+  );
 
   return NextResponse.json(
     { success: true, data: { documentId: doc.id, status: 'new' } },

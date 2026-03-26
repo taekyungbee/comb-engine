@@ -10,9 +10,12 @@ outsource-hub 등 다른 프로젝트가 API로 활용하는 독립 서비스.
 - **프레임워크**: Next.js 15.x (App Router)
 - **언어**: TypeScript 5.x (strict mode)
 - **스타일링**: TailwindCSS 4.x
-- **ORM**: Prisma + pgvector
-- **데이터베이스**: PostgreSQL 16 (vector extension)
-- **임베딩**: Gemini embedding-2-preview (3072차원, 멀티모달)
+- **ORM**: Prisma (문서 메타데이터)
+- **데이터베이스**: PostgreSQL 16 (문서/소스/컬렉션 메타데이터)
+- **벡터DB**: Qdrant (dense + sparse Hybrid Search, RRF fusion)
+- **임베딩(텍스트)**: bge-m3 1024d (Ollama 로컬, 비용 0원)
+- **임베딩(멀티모달)**: Gemini embedding-002 3072d (이미지/표 전용, 별도 컬렉션)
+- **Reranker**: bge-reranker-v2-m3 (FastAPI 서비스)
 - **인증**: JWT + API Key (bcrypt, jsonwebtoken)
 - **스케줄링**: node-cron (per-source 동적 cron)
 - **패키지 매니저**: pnpm
@@ -52,14 +55,15 @@ src/
 │   └── page.tsx                # 대시보드
 ├── collectors/                 # 데이터 수집 플러그인 (12 타입)
 ├── lib/
-│   ├── ai-core/index.ts        # GeminiEmbeddingProvider (3072차원, 멀티모달)
+│   ├── ai-core/index.ts        # OllamaEmbeddingProvider(bge-m3) + GeminiEmbeddingProvider(이미지)
 │   ├── auth.ts                 # JWT + API Key + Password 유틸
 │   ├── prisma.ts               # Prisma 클라이언트 싱글톤
+│   ├── qdrant.ts               # Qdrant 클라이언트 + sparse vector 생성
 │   ├── scheduler.ts            # node-cron 동적 스케줄러
 │   └── rag/
-│       ├── embedding.ts        # pgvector 초기화/저장/이미지 임베딩
-│       ├── indexer.ts          # 수집 → AI요약(V1) → chunk → embed → store
-│       └── search.ts           # 벡터 유사도 검색 (컬렉션 필터 지원)
+│       ├── embedding.ts        # bge-m3 임베딩 (1024d) + 이미지 임베딩
+│       ├── indexer.ts          # 수집 → smartChunk → embed → Qdrant 적재
+│       └── search.ts           # Qdrant Hybrid Search + Reranker
 ├── services/                   # 비즈니스 로직
 └── instrumentation.ts          # 서버 시작 시 스케줄러 초기화
 
@@ -108,17 +112,42 @@ rag-collector (192.168.0.67:11009, 내부)
 Collector.collect() → CollectedItem[]
   → 쓰레기 데이터 필터링 (10자 미만 제외)
   → SHA-256 contentHash 중복 체크
-  → Document 저장 (Prisma, 컬렉션 연결)
-  → AI 요약 생성 (V1, Gemini flash-lite)
-  → chunkText(요약 or 원본) (500자, 50 오버랩)
-  → DocumentChunk 저장
-  → GeminiEmbeddingProvider.embedBatch() (3072차원)
-  → UPDATE document_chunks SET embedding = vector
-  ※ 임베딩은 V1 요약 완료 후 1회만 실행
+  → Document 저장 (Prisma)
+  → smartChunk(소스타입별 의미 단위 청킹)
+  → 메타데이터 헤더 강화 (목적/파라미터/테이블)
+  → bge-m3 임베딩 (1024d, Ollama 로컬)
+  → Qdrant upsert (dense + sparse)
+```
+
+## 검색 파이프라인
+
+```
+Query → bge-m3 임베딩 + sparse vector 생성
+  → Qdrant Dense top-20 + Sparse top-20 + Keyword filter
+  → 합집합 → bge-reranker-v2-m3 (Reranker)
+  → top-K 반환
+  ※ Reranker 서비스 다운 시 Hybrid 점수로 fallback
 ```
 
 ## 인프라
 
-- **Gitea**: http://192.168.0.67:3000/geng/rag-collector
-- **Coolify**: http://192.168.0.67:8880
-- **PostgreSQL**: localhost:5432/rag_collector
+| 서비스 | 주소 | 포트 규칙 |
+|--------|------|----------|
+| **Qdrant** | 192.168.0.67:12333 | 인프라(12000대) |
+| **Reranker** | 192.168.0.67:10800 | API(10000대) |
+| **PostgreSQL** | 192.168.0.67:5433 | 인프라 |
+| **Ollama** | localhost:11434 | 로컬 |
+| **Gitea** | http://192.168.0.67:3000/geng/rag-collector | |
+| **Coolify** | http://192.168.0.67:8880 | |
+
+## RAG 품질 (Ragas 공식 평가, 20TC)
+
+| 지표 | 점수 |
+|------|------|
+| Context Precision | 0.894 |
+| Context Recall | 0.950 |
+| Faithfulness | 0.848 |
+| Answer Relevancy | 0.849 |
+| **OVERALL** | **0.885** |
+
+Judge: gemini-2.5-flash, 평가 프레임워크: Ragas 0.4.3

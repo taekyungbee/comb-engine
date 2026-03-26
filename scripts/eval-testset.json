@@ -1,0 +1,61 @@
+[
+  {"id":1,"category":"oracle_procedure","difficulty":"easy","question":"분배 프로시저 SP_TRANS_TDIS_DISTR의 역할은?","ground_truth":"년도별로 분배내역을 이행하는 프로시저. 방송, CATV, 기타, 전송, 연주 등 매체별 국내/해외 분배와 외국입금 분배를 순차 실행한다.","expected_sources":["FIDU.PROCEDURE.SP_TRANS_TDIS_DISTR"]},
+  {"id":2,"category":"oracle_procedure","difficulty":"medium","question":"외국입금 무자료 분배는 어떤 프로시저가 담당하는가?","ground_truth":"SP_DISTR_ABR_NOLOG 프로시저가 외국입금 무자료 분배를 담당한다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_ABR_NOLOG"]},
+  {"id":3,"category":"oracle_procedure","difficulty":"hard","question":"방송2차 분배 프로시저의 커서는 어떤 테이블을 조회하는가?","ground_truth":"SP_DISTR_BRDCSTWO의 GET_DISTR_PGM 커서는 FIDU.TDIS_BRDCSTWORPDCPGM 테이블을 조회한다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_BRDCSTWO"]},
+  {"id":4,"category":"oracle_procedure","difficulty":"hard","question":"분배 프로시저에서 PARAM_SOGB_YN 파라미터의 역할은?","ground_truth":"소급 여부 파라미터로 Y이면 소급분배, N이면 일반분배(DISTR_NUM=99999)로 처리한다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_BRDCS","FIDU.PROCEDURE.SP_DISTR_ABR_NOLOG"]},
+  {"id":5,"category":"oracle_procedure","difficulty":"hard","question":"KOMCA 분배 시스템에서 매체별 분배 순서는?","ground_truth":"방송, CATV, 기타, 전송, 연주 등 매체별 국내/해외 분배와 외국입금 순서로 실행된다.","expected_sources":["FIDU.PROCEDURE.SP_TRANS_TDIS_DISTR"]},
+  {"id":6,"category":"oracle_table","difficulty":"easy","question":"FIDU.TDIS_ABR_ERR_RETURN 테이블의 용도는?","ground_truth":"외국입금 분배 오류 반환 데이터를 저장하는 테이블이다.","expected_sources":["FIDU.TDIS_ABR_ERR_RETURN"]},
+  {"id":7,"category":"oracle_table","difficulty":"medium","question":"AS-IS FIDU.TENV_SVCCD 테이블은 TO-BE에서 어떤 이름으로 변경되었는가?","ground_truth":"HKITSDEV_FIDU.TENV_SVC_CD로 변경되었다. 서비스코드 관리 테이블이다.","expected_sources":["컬럼매핑: FIDU.TENV_SVCCD"]},
+  {"id":8,"category":"oracle_function","difficulty":"medium","question":"GET_TMEM_DAEPYO_ADDR 함수의 역할은?","ground_truth":"회원의 대표 주소를 조회하는 함수이다. 회원코드(MB_CD)를 입력받는다.","expected_sources":["FIDU.FUNCTION.GET_TMEM_DAEPYO_ADDR"]},
+  {"id":9,"category":"oracle_procedure","difficulty":"medium","question":"SP_DISTR_HIS_UPDATE 프로시저는 무엇을 하는가?","ground_truth":"분배 이력을 업데이트하는 프로시저이다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_HIS_UPDATE"]},
+  {"id":10,"category":"java_tobe","difficulty":"easy","question":"TO-BE 시스템에서 외국입금 무자료 분배를 처리하는 Java 서비스 클래스는?","ground_truth":"AbrNologDistProcessRequest를 사용하는 Command Service 구현 클래스가 담당한다. AS-IS SP_DISTR_ABR_NOLOG를 대체한다.","expected_sources":["kr.or.komca.collectdist.dist.service.command.AbrNo"]},
+  {"id":11,"category":"java_tobe","difficulty":"medium","question":"TO-BE 시스템의 BillController는 어떤 기능을 제공하는가?","ground_truth":"징수(levy) 모듈의 청구(bill) 관련 API를 제공하는 컨트롤러이다.","expected_sources":["kr.or.komca.collectdist.levy.demd.bill.api.BillController"]},
+  {"id":12,"category":"java_tobe","difficulty":"medium","question":"TO-BE 외국분배자료(foreigndistdata) 서비스의 역할은?","ground_truth":"외국 분배 자료를 생성하고 관리하는 Command Service이다.","expected_sources":["kr.or.komca.collectdist.dist.foreigndistdata.service.command"]},
+  {"id":13,"category":"java_batch","difficulty":"medium","question":"Netflix 큐시트 배치 처리에 사용되는 DTO 클래스는?","ground_truth":"NetflixRe DTO 클래스가 Netflix 큐시트(cuesheet) 방송 배치 처리에 사용된다.","expected_sources":["kr.or.komca.collectdist.batch.broadcast.cuesheet.netflix.dto"]},
+  {"id":14,"category":"java_legacy","difficulty":"hard","question":"레거시 Java 시스템의 MIG_BRDCS111 클래스는 무엇을 하는가?","ground_truth":"방송(BRDCS) 데이터 마이그레이션을 수행하는 레거시 클래스이다.","expected_sources":["komca.fi.mig.MIG_BRDCS111"]},
+  {"id":15,"category":"business_rule","difficulty":"easy","question":"KOMCA-1796 JIRA 이슈의 내용은?","ground_truth":"음악저작자 실시간 이용현황 안내의 큐시트 이용현황 프로그램 검색 기능 백엔드 개발 이슈이다.","expected_sources":["[BUSINESS_RULE] KOMCA-1796"]},
+  {"id":16,"category":"business_rule","difficulty":"medium","question":"KOMCA-1805 이슈에서 구현해야 할 기능은?","ground_truth":"저작물검색의 전체검색에서 저작자 저작물 조회 기본 기능의 백엔드 개발이다. 완료 상태이다.","expected_sources":["[BUSINESS_RULE] KOMCA-1805"]},
+  {"id":17,"category":"document_migration","difficulty":"medium","question":"AS-IS FIDU.TLEV_CONTR_INFO 테이블의 용도와 TO-BE 매핑은?","ground_truth":"징수를 위한 거래처와의 계약정보를 관리하는 테이블이다. TO-BE에서 HKITSDEV_FIDU.TLEV_CONTR_INFO로 매핑된다.","expected_sources":["컬럼매핑: FIDU. → HKITSDEV_FIDU.TLEV_CONTR_INFO"]},
+  {"id":18,"category":"document_migration","difficulty":"hard","question":"AS-IS TLEV_YETMNGTUNE 테이블은 TO-BE에서 어떤 이름이고 어떤 용도인가?","ground_truth":"TO-BE에서 TLEV_NON_MNG_TUNE으로 변경. 공연, 반주기 등에서 미관리곡 정보를 저장한다.","expected_sources":["컬럼매핑: FIDU.TLEV_YETMNGTUNE"]},
+  {"id":19,"category":"frontend","difficulty":"medium","question":"프론트엔드에서 큐시트 해제 요청 시 어떤 DTO를 사용하는가?","ground_truth":"SchdQsheetRelsUpdateRequest DTO를 사용하며, 편성표 순번(seq)과 에피소드코드(epsdCd)를 포함한다.","expected_sources":["komca-collectdist-front/src/network/apis/comm/brdcs/media/schd"]},
+  {"id":20,"category":"cross_source","difficulty":"hard","question":"TOPU_CWR_ACK 테이블은 무엇을 저장하고, 관련된 TO-BE 테이블은?","ground_truth":"CWR(Common Works Registration) ACK(확인) 데이터를 저장하는 테이블이다.","expected_sources":["FIDU.TOPU_CWR_ACK"]},
+
+  {"id":21,"category":"api_endpoint","difficulty":"easy","question":"엑셀 파일로 분배 데이터를 일괄 수입하는 API 엔드포인트는?","ground_truth":"POST /api/v1/dist/imports/excel 엔드포인트로 엑셀 파일을 업로드하여 분배 데이터를 일괄 수입한다.","expected_sources":["[API_ENDPOINT] API:POST /api/v1/dist/imports/excel"]},
+  {"id":22,"category":"api_endpoint","difficulty":"medium","question":"승인대장 일괄 출력 API는 어떤 경로인가?","ground_truth":"POST /api/v1/dist/apprv-registers/print/batch 엔드포인트로 승인대장을 배치 출력한다.","expected_sources":["[API_ENDPOINT] API:POST /api/v1/dist/apprv-registers/print/batch"]},
+  {"id":23,"category":"api_endpoint","difficulty":"medium","question":"거래처 계약 승인 삭제 API의 경로와 파라미터는?","ground_truth":"POST /api/v1/levy/contr/bscon/apprv/delete/${contrNo} 엔드포인트로 계약번호를 지정하여 승인을 삭제한다.","expected_sources":["[API_ENDPOINT] API:POST /api/v1/levy/contr/bscon/apprv/delete"]},
+  {"id":24,"category":"api_endpoint","difficulty":"easy","question":"온라인 사용곡 목록을 조회하는 API는?","ground_truth":"GET /api/v1/comm/logs/ydn/online-use-tune/list 엔드포인트로 온라인 사용곡 목록을 조회한다.","expected_sources":["[API_ENDPOINT] API:GET /api/v1/comm/logs/ydn/online-use-tune/list"]},
+  {"id":25,"category":"api_endpoint","difficulty":"hard","question":"공급곡목 중복 검사 API의 경로는?","ground_truth":"GET /api/v1/comm/logs/ydn/supply-include-song/duplicate-check 엔드포인트로 공급곡목의 중복 여부를 확인한다.","expected_sources":["[API_ENDPOINT] API:GET /api/v1/comm/logs/ydn/supply-include-song/duplicate-check"]},
+
+  {"id":26,"category":"terminology","difficulty":"easy","question":"KOMCA 용어사전에서 EPSD의 의미는?","ground_truth":"EPSD는 Episode의 약자로, 드라마나 프로그램의 각 회차를 의미한다.","expected_sources":["용어사전"]},
+  {"id":27,"category":"terminology","difficulty":"easy","question":"KOMCA 용어사전에서 ARRGE의 의미는?","ground_truth":"ARRGE는 Arrangement의 약자로, 음악의 편곡이나 배치를 의미한다.","expected_sources":["용어사전"]},
+  {"id":28,"category":"terminology","difficulty":"medium","question":"KOMCA 용어사전에서 HOMP는 무엇을 뜻하는가?","ground_truth":"HOMP는 Homepage의 약자로, 웹사이트의 첫 페이지인 홈페이지를 의미한다.","expected_sources":["용어사전"]},
+
+  {"id":29,"category":"business_rule","difficulty":"easy","question":"KOMCA-5079 JIRA 이슈는 어떤 도메인에 속하는가?","ground_truth":"KOMCA-5079 이슈의 도메인과 상태를 확인한다.","expected_sources":["[BUSINESS_RULE] KOMCA-5079"]},
+  {"id":30,"category":"business_rule","difficulty":"medium","question":"KOMCA-4082 이슈의 내용은?","ground_truth":"KOMCA-4082 이슈의 기능과 도메인을 확인한다.","expected_sources":["[BUSINESS_RULE] KOMCA-4082"]},
+  {"id":31,"category":"business_rule","difficulty":"medium","question":"KOMCA-3755 이슈의 담당자와 상태는?","ground_truth":"KOMCA-3755 이슈의 담당자와 현재 진행 상태를 확인한다.","expected_sources":["[BUSINESS_RULE] KOMCA-3755"]},
+  {"id":32,"category":"business_rule","difficulty":"hard","question":"센터관리 도메인의 JIRA 이슈에는 어떤 것들이 있는가?","ground_truth":"센터관리 도메인에 속하는 JIRA 이슈 목록을 확인한다.","expected_sources":["[BUSINESS_RULE] KOMCA-5382"]},
+
+  {"id":33,"category":"java_tobe","difficulty":"easy","question":"TO-BE 시스템에서 방송 분배 기록을 처리하는 Mapper는?","ground_truth":"BrdcsDistrRecMapper가 TDIS_BRDCS_DISTR_REC 테이블에 접근하여 방송 분배 기록을 처리한다.","expected_sources":["kr.or.komca.collectdist"]},
+  {"id":34,"category":"java_tobe","difficulty":"medium","question":"TO-BE 시스템의 큐시트 컨트롤러 테스트 클래스는?","ground_truth":"QsheetControllerTest 클래스가 큐시트 API를 테스트한다.","expected_sources":["kr.or.komca.collectdist.comm.brdcs.qsheet.api.QsheetControllerTest"]},
+  {"id":35,"category":"java_tobe","difficulty":"hard","question":"TO-BE 분배 파라미터 빌더(DistParamBuilder)의 역할은?","ground_truth":"DistParamBuilder는 분배 처리에 필요한 파라미터(총점수, 단가, 소급구분 등)를 Map으로 구성하는 유틸리티이다.","expected_sources":["kr.or.komca.collectdist.dist.util.DistParamBuilder"]},
+
+  {"id":36,"category":"oracle_table","difficulty":"easy","question":"FIDU.TOPU_AVI_RAW 테이블은 무엇을 저장하는가?","ground_truth":"AVI 원본 데이터를 저장하는 테이블이다. AVI_NUM, GRP_SEQ 등의 컬럼이 있다.","expected_sources":["FIDU.TOPU_AVI_RAW"]},
+  {"id":37,"category":"oracle_table","difficulty":"medium","question":"HKITSDEV_FIDU.TDIS_COMPENSATION_LOG 테이블의 용도는?","ground_truth":"분배 보상 로그를 저장하는 TO-BE 테이블이다. 47개 컬럼을 포함한다.","expected_sources":["HKITSDEV_FIDU.TDIS_COMPENSATION_LOG"]},
+  {"id":38,"category":"oracle_table","difficulty":"hard","question":"GIBU 스키마의 TBRA_SMS_FORMAT 테이블은 무엇인가?","ground_truth":"GIBU 스키마의 SMS 포맷 관리 테이블이다. 지부별(BRAN_CD) SMS 양식을 저장한다.","expected_sources":["GIBU.TBRA_SMS_FORMAT"]},
+
+  {"id":39,"category":"frontend","difficulty":"easy","question":"프론트엔드에서 보상금지급 목록을 엑셀로 다운로드하는 DTO는?","ground_truth":"RpdcRewardDemdPaymentExcel DTO를 사용하여 보상금지급 목록을 엑셀로 다운로드한다.","expected_sources":["komca-collectdist-front/src/network/apis/levy/rpdc/reward"]},
+  {"id":40,"category":"frontend","difficulty":"medium","question":"프론트엔드에서 관리비율 거래처 저장 요청에 사용하는 DTO는?","ground_truth":"MngRatioBsconSaveRequest DTO를 사용하여 신규 데이터를 저장한다.","expected_sources":["komca-collectdist-front/src/network/apis/comm/mngratio/bscon"]},
+  {"id":41,"category":"frontend","difficulty":"hard","question":"프론트엔드 수금 목록 조회 훅의 이름과 역할은?","ground_truth":"use-fetch-rcpt-list 훅이 수금(receipt) 목록을 조회하는 데 사용된다.","expected_sources":["komca-collectdist-front/src/utils/hooks/apis/levy/rcpt"]},
+
+  {"id":42,"category":"document_migration","difficulty":"easy","question":"AS-IS FIDU.TOPU_CERTIFICATE_HISTORY 테이블의 TO-BE 이름은?","ground_truth":"TO-BE에서 HKITSDEV_FIDU.TOPU_CERT_HIST로 변경되었다.","expected_sources":["컬럼매핑: FIDU.TOPU_CERTIFICATE_HISTORY"]},
+  {"id":43,"category":"document_migration","difficulty":"medium","question":"AS-IS FIDU.BILL_TRANS 테이블은 TO-BE에서 어떤 이름이고 어떤 용도인가?","ground_truth":"TO-BE에서 HKITSDEV_FIDU.BILL_SEND로 변경. 세금계산서, 계산서, 거래명세서 등의 문서 정보를 저장한다.","expected_sources":["컬럼매핑: FIDU.BILL_TRANS"]},
+  {"id":44,"category":"document_migration","difficulty":"hard","question":"AS-IS FIDU.TENV_AVECLASSCD의 TO-BE 이름과 용도는?","ground_truth":"TO-BE에서 HKITSDEV_FIDU.TENV_AVE_CLASS_CD로 변경. 매체중분류코드를 관리한다.","expected_sources":["컬럼매핑: FIDU.TENV_AVECLASSCD"]},
+
+  {"id":45,"category":"cross_source","difficulty":"medium","question":"징수 모듈의 계약(contr) 관련 API와 테이블은 어떤 것이 있는가?","ground_truth":"/api/v1/levy/contr/ 하위 API로 거래처 계약을 관리하며, TLEV_CONTR_INFO 테이블과 연관된다.","expected_sources":["[API_ENDPOINT] API:POST /api/v1/levy/contr","컬럼매핑: FIDU. → HKITSDEV_FIDU.TLEV_CONTR_INFO"]},
+  {"id":46,"category":"cross_source","difficulty":"hard","question":"방송 분배 관련 AS-IS 프로시저와 TO-BE Java 서비스의 매핑 관계는?","ground_truth":"AS-IS SP_DISTR_BRDCS 프로시저는 TO-BE에서 BrdcsDistrRecMapper와 관련 서비스 클래스로 대체된다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_BRDCS","kr.or.komca.collectdist"]},
+  {"id":47,"category":"cross_source","difficulty":"hard","question":"외국입금 분배의 AS-IS 테이블과 TO-BE API 엔드포인트는?","ground_truth":"AS-IS TDIS_ABR_ERR_RETURN 테이블의 오류 데이터를 TO-BE에서는 /api/v1/dist/foreign-dist-data 엔드포인트로 관리한다.","expected_sources":["FIDU.TDIS_ABR_ERR_RETURN","[API_ENDPOINT] API:GET /api/v1/dist/foreign-dist-data"]},
+
+  {"id":48,"category":"oracle_procedure","difficulty":"medium","question":"SP_DISTR_RESULT_SIMUL 프로시저의 역할은?","ground_truth":"분배 결과 시뮬레이션을 수행하는 프로시저이다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_RESULT_SIMUL"]},
+  {"id":49,"category":"java_batch","difficulty":"hard","question":"TO-BE 배치에서 방송 큐시트를 처리하는 패키지 구조는?","ground_truth":"kr.or.komca.collectdist.batch.broadcast.cuesheet 패키지 하위에 Netflix, 일반 방송 등 큐시트 배치 처리가 구현되어 있다.","expected_sources":["kr.or.komca.collectdist.batch.broadcast.cuesheet"]},
+  {"id":50,"category":"oracle_procedure","difficulty":"easy","question":"SP_DISTR_BATCH 프로시저의 역할은?","ground_truth":"분배 배치 처리를 수행하는 프로시저이다.","expected_sources":["FIDU.PROCEDURE.SP_DISTR_BATCH"]}
+]
