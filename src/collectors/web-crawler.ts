@@ -9,7 +9,7 @@ import { createHash } from 'crypto';
 export class WebCrawlCollector extends BaseCollector {
   readonly type = 'WEB_CRAWL' as const;
 
-  validate(config: unknown): boolean {
+  validate(_config: unknown): boolean {
     return true;
   }
 

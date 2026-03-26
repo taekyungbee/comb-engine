@@ -95,3 +95,15 @@ export interface GitCloneConfig {
   maxFileSize?: number;
   includeTests?: boolean;
 }
+
+export interface DatabaseConfig {
+  dbType: 'oracle' | 'postgresql' | 'mysql';
+  connectionString: string;
+  user?: string;
+  password?: string;
+  schemas?: string[];
+  objectTypes?: Array<'TABLE' | 'PROCEDURE' | 'FUNCTION' | 'VIEW'>;
+  maxRows?: number;
+  includeColumnInfo?: boolean;
+  includeDDL?: boolean;
+}

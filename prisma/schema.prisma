@@ -124,6 +124,7 @@ enum SourceType {
   XML_UI
   FRONTEND_SOURCE
   DOCUMENT
+  DATABASE
 }
 
 // =============================================

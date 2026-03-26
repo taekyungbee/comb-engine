@@ -48,6 +48,7 @@ function toRagSourceType(sourceType: SourceType): RagSourceType {
     GOOGLE_CHAT: 'GENERIC',
     GIT_CLONE: 'GITHUB_REPO',
     API_INGEST: 'API_INGEST',
+    DATABASE: 'GENERIC',
   };
   return map[sourceType] ?? 'GENERIC';
 }

@@ -33,8 +33,18 @@ export class YouTubeCollector extends BaseCollector {
     const feed = await parser.parseURL(feedUrl);
     const items: CollectedItem[] = [];
 
+    // 전일자 필터: cron으로 실행 시 최근 48시간 이내 영상만 수집
+    const cutoffDate = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const hasCron = !!source.cronExpr;
+
     for (const entry of feed.items.slice(0, maxResults)) {
       if (!entry.title || !entry.link) continue;
+
+      // cron 수집 시 전일자 필터링 (수동 수집은 필터링 안함)
+      if (hasCron && entry.pubDate) {
+        const pubDate = new Date(entry.pubDate);
+        if (pubDate < cutoffDate) continue;
+      }
 
       const videoId = extractVideoId(entry.link);
       if (!videoId) continue;

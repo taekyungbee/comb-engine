@@ -10,7 +10,7 @@ const parser = new Parser();
 export class RssCollector extends BaseCollector {
   readonly type = 'RSS_FEED' as const;
 
-  validate(config: unknown): boolean {
+  validate(_config: unknown): boolean {
     return true; // RSS는 url만 있으면 됨
   }
 

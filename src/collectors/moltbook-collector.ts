@@ -45,7 +45,7 @@ interface MoltbookPost {
 export class MoltbookCollector extends BaseCollector {
   readonly type = 'MOLTBOOK' as const;
 
-  validate(config: unknown): boolean {
+  validate(_config: unknown): boolean {
     return true;
   }
 

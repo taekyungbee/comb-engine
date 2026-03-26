@@ -2,7 +2,7 @@ import type { CollectorSource } from '@prisma/client';
 import { BaseCollector } from './base-collector';
 import type { CollectedItem, GoogleWorkspaceConfig } from './types';
 import { createHash } from 'crypto';
-import { readFile, writeFile, mkdtemp, rm } from 'fs/promises';
+import { readFile, mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 

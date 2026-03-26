@@ -12,6 +12,7 @@ import { GmailCollector } from './gmail-collector';
 import { CalendarCollector } from './calendar-collector';
 import { GoogleChatCollector } from './google-chat-collector';
 import { GitCloneCollector } from './git-clone-collector';
+import { DatabaseCollector } from './database-collector';
 
 const collectors = new Map<SourceType, Collector>();
 
@@ -32,6 +33,7 @@ register(new GmailCollector());
 register(new CalendarCollector());
 register(new GoogleChatCollector());
 register(new GitCloneCollector());
+register(new DatabaseCollector());
 
 export function getCollector(type: SourceType): Collector {
   const collector = collectors.get(type);
