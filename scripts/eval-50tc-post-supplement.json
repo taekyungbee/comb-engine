@@ -1,0 +1,310 @@
+{
+  "timestamp": "2026-03-26T11:59:37.175Z",
+  "method": "qdrant_hybrid_reranker_50tc_post_supplement",
+  "metrics": {
+    "CP": 0.7440000000000001,
+    "CR": 0.6973030303030306
+  },
+  "per_tc": [
+    {
+      "id": 1,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 0.875
+    },
+    {
+      "id": 2,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 0.8333333333333334
+    },
+    {
+      "id": 3,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 0.7142857142857143
+    },
+    {
+      "id": 4,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 5,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 0.8333333333333334
+    },
+    {
+      "id": 6,
+      "category": "oracle_table",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 7,
+      "category": "oracle_table",
+      "cp": 1,
+      "cr": 0.8333333333333334
+    },
+    {
+      "id": 8,
+      "category": "oracle_function",
+      "cp": 0,
+      "cr": 0.375
+    },
+    {
+      "id": 9,
+      "category": "oracle_procedure",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 10,
+      "category": "java_tobe",
+      "cp": 0,
+      "cr": 0.5555555555555556
+    },
+    {
+      "id": 11,
+      "category": "java_tobe",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 12,
+      "category": "java_tobe",
+      "cp": 0.5,
+      "cr": 0.5714285714285714
+    },
+    {
+      "id": 13,
+      "category": "java_batch",
+      "cp": 1,
+      "cr": 0.8888888888888888
+    },
+    {
+      "id": 14,
+      "category": "java_legacy",
+      "cp": 0,
+      "cr": 0.16666666666666666
+    },
+    {
+      "id": 15,
+      "category": "business_rule",
+      "cp": 1,
+      "cr": 0.7
+    },
+    {
+      "id": 16,
+      "category": "business_rule",
+      "cp": 0,
+      "cr": 0.45454545454545453
+    },
+    {
+      "id": 17,
+      "category": "document_migration",
+      "cp": 0,
+      "cr": 0.4444444444444444
+    },
+    {
+      "id": 18,
+      "category": "document_migration",
+      "cp": 1,
+      "cr": 0.6
+    },
+    {
+      "id": 19,
+      "category": "frontend",
+      "cp": 1,
+      "cr": 0.7142857142857143
+    },
+    {
+      "id": 20,
+      "category": "cross_source",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 21,
+      "category": "api_endpoint",
+      "cp": 1,
+      "cr": 0.8
+    },
+    {
+      "id": 22,
+      "category": "api_endpoint",
+      "cp": 1,
+      "cr": 0.8333333333333334
+    },
+    {
+      "id": 23,
+      "category": "api_endpoint",
+      "cp": 1,
+      "cr": 0.8571428571428571
+    },
+    {
+      "id": 24,
+      "category": "api_endpoint",
+      "cp": 1,
+      "cr": 0.8571428571428571
+    },
+    {
+      "id": 25,
+      "category": "api_endpoint",
+      "cp": 0,
+      "cr": 0.42857142857142855
+    },
+    {
+      "id": 26,
+      "category": "terminology",
+      "cp": 1,
+      "cr": 0.8571428571428571
+    },
+    {
+      "id": 27,
+      "category": "terminology",
+      "cp": 1,
+      "cr": 0.8571428571428571
+    },
+    {
+      "id": 28,
+      "category": "terminology",
+      "cp": 1,
+      "cr": 0.8571428571428571
+    },
+    {
+      "id": 29,
+      "category": "business_rule",
+      "cp": 1,
+      "cr": 0.8
+    },
+    {
+      "id": 30,
+      "category": "business_rule",
+      "cp": 0.2,
+      "cr": 0.6
+    },
+    {
+      "id": 31,
+      "category": "business_rule",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 32,
+      "category": "business_rule",
+      "cp": 1,
+      "cr": 0.7142857142857143
+    },
+    {
+      "id": 33,
+      "category": "java_tobe",
+      "cp": 1,
+      "cr": 0.5
+    },
+    {
+      "id": 34,
+      "category": "java_tobe",
+      "cp": 1,
+      "cr": 0.6
+    },
+    {
+      "id": 35,
+      "category": "java_tobe",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 36,
+      "category": "oracle_table",
+      "cp": 1,
+      "cr": 0.6666666666666666
+    },
+    {
+      "id": 37,
+      "category": "oracle_table",
+      "cp": 0,
+      "cr": 0.14285714285714285
+    },
+    {
+      "id": 38,
+      "category": "oracle_table",
+      "cp": 0,
+      "cr": 0.3
+    },
+    {
+      "id": 39,
+      "category": "frontend",
+      "cp": 1,
+      "cr": 0.7142857142857143
+    },
+    {
+      "id": 40,
+      "category": "frontend",
+      "cp": 1,
+      "cr": 1
+    },
+    {
+      "id": 41,
+      "category": "frontend",
+      "cp": 1,
+      "cr": 0.8
+    },
+    {
+      "id": 42,
+      "category": "document_migration",
+      "cp": 1,
+      "cr": 0.5
+    },
+    {
+      "id": 43,
+      "category": "document_migration",
+      "cp": 1,
+      "cr": 0.7272727272727273
+    },
+    {
+      "id": 44,
+      "category": "document_migration",
+      "cp": 0.5,
+      "cr": 0.8333333333333334
+    },
+    {
+      "id": 45,
+      "category": "cross_source",
+      "cp": 1,
+      "cr": 0.6666666666666666
+    },
+    {
+      "id": 46,
+      "category": "cross_source",
+      "cp": 1,
+      "cr": 0.7142857142857143
+    },
+    {
+      "id": 47,
+      "category": "cross_source",
+      "cp": 0,
+      "cr": 0.5
+    },
+    {
+      "id": 48,
+      "category": "oracle_procedure",
+      "cp": 0,
+      "cr": 0.2
+    },
+    {
+      "id": 49,
+      "category": "java_batch",
+      "cp": 1,
+      "cr": 0.7777777777777778
+    },
+    {
+      "id": 50,
+      "category": "oracle_procedure",
+      "cp": 0,
+      "cr": 0.2
+    }
+  ]
+}

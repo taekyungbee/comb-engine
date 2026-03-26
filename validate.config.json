@@ -1,0 +1,47 @@
+{
+  "stepTimeout": 60000,
+  "totalTimeout": 300000,
+  "coverageThreshold": 70,
+  "maxOutputLines": 10,
+  "auditLevel": "high",
+  "lintScripts": ["lint", "lint:fix"],
+  "typecheckScripts": ["typecheck", "type-check"],
+  "testScripts": ["test:unit", "test"],
+  "coverageScripts": ["test:coverage"],
+  "eslintConfigFiles": [
+    "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs", "eslint.config.ts",
+    ".eslintrc.js", ".eslintrc.json", ".eslintrc.cjs"
+  ],
+  "tsconfigFiles": ["tsconfig.json"],
+  "testConfigFiles": [
+    "vitest.config.ts", "vitest.config.js", "vitest.config.mjs",
+    "jest.config.js", "jest.config.ts", "jest.config.cjs", "jest.config.mjs"
+  ],
+  "packageManagers": {
+    "pnpm-lock.yaml": "pnpm",
+    "yarn.lock": "yarn",
+    "bun.lockb": "bun",
+    "package-lock.json": "npm"
+  },
+  "secretScanCommand": "gitleaks detect --source . --no-git",
+  "hardcodedData": {
+    "extensions": [".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte"],
+    "excludeDirs": [
+      "node_modules", "__tests__", "__mocks__", "test", "tests", "e2e",
+      "fixtures", "dist", "build", ".next", "coverage", "storybook"
+    ],
+    "excludeFilePatterns": [
+      "\\.test\\.", "\\.spec\\.", "\\.mock\\.", "\\.fixture\\.", "\\.story\\.",
+      "\\.config\\.", "\\.d\\.ts$", "seed", "migration", "factory"
+    ],
+    "minArrayItems": 5,
+    "suspiciousPatterns": [
+      "(?:const|let|var)\\s+\\w+\\s*=\\s*\\[\\s*\\{[^\\]]{200,}\\]",
+      "(?:const|let|var)\\s+\\w+(?:Data|List|Items|Options|Rows|Records|Entries)\\s*(?::\\s*\\w+(?:\\[\\]|<[^>]+>))?\\s*=\\s*\\[",
+      "(?:return|render|display|show).*\\[\\s*\\{[^\\]]{300,}\\]",
+      "(?:useState|useMemo|useRef)\\s*\\(\\s*\\[\\s*\\{[^\\]]{200,}\\]",
+      "(?:dummy|fake|mock|sample|placeholder|hardcode|static)(?:Data|List|Items)",
+      "(?:TODO|FIXME|HACK|TEMP).*(?:hardcod|replace.*(?:api|fetch|query))"
+    ]
+  }
+}
