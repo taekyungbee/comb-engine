@@ -11,7 +11,7 @@ const nextConfig = {
   },
 
   // node-cron, pdf-parse 등 서버 전용 패키지
-  serverExternalPackages: ['node-cron', 'pdf-parse', 'youtubei.js'],
+  serverExternalPackages: ['node-cron', 'pdf-parse', 'youtubei.js', 'oracledb', 'pg', 'mysql2'],
 
   // 이미지 최적화 설정
   images: {
