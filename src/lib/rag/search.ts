@@ -127,6 +127,7 @@ export async function searchSimilar(
   const reranked = await rerank(query, combined, limit);
 
   // SearchResult로 변환 (제어 문자 제거)
+  // eslint-disable-next-line no-control-regex
   const sanitize = (s: string) => s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 
   const results: SearchResult[] = reranked.map((point) => ({

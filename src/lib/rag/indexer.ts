@@ -51,7 +51,7 @@ function chunkByLines(text: string, maxLen: number): { text: string; index: numb
 }
 
 /** 소스 타입별 스마트 청킹 */
-function smartChunk(content: string, opts: { sourceType: string }): { text: string; index: number }[] {
+function smartChunk(content: string, _opts: { sourceType: string }): { text: string; index: number }[] {
   if (content.length <= CHUNK_SIZE) return [{ text: content, index: 0 }];
   return chunkByLines(content, CHUNK_SIZE);
 }
