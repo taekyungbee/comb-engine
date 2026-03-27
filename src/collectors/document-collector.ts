@@ -18,8 +18,9 @@ const OFFICE_EXTENSIONS = new Set([
   'odp', 'ods', 'odt', 'rtf', 'csv',
 ]);
 
-const GEMINI_API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
-const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-3.1-flash-lite-preview';
+const ZAI_URL = process.env.ZAI_URL || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
+const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
+const ZAI_VISION_MODEL = process.env.ZAI_VISION_MODEL || 'glm-4.6v';
 
 export class DocumentCollector extends BaseCollector {
   readonly type = 'DOCUMENT_FILE' as const;
@@ -36,8 +37,8 @@ export class DocumentCollector extends BaseCollector {
     const fileType = config.fileType || 'txt';
     const fileName = basename(config.filePath);
 
-    // PPT 멀티모달: 슬라이드별 이미지 → Gemini Vision 분석
-    if (PRESENTATION_EXTENSIONS.has(fileType) && GEMINI_API_KEY) {
+    // PPT 멀티모달: 슬라이드별 이미지 → z.ai Vision 분석
+    if (PRESENTATION_EXTENSIONS.has(fileType) && ZAI_API_KEY) {
       return this.collectPresentationMultimodal(config.filePath, fileName, fileType);
     }
 
@@ -77,7 +78,7 @@ export class DocumentCollector extends BaseCollector {
   }
 
   /**
-   * PPT 멀티모달 수집: 슬라이드별 이미지 변환 → Gemini Vision 분석/요약
+   * PPT 멀티모달 수집: 슬라이드별 이미지 변환 → z.ai Vision 분석/요약
    * 화면설계서의 레이아웃, 테이블, 다이어그램을 제대로 추출
    */
   private async collectPresentationMultimodal(
@@ -215,7 +216,7 @@ export class DocumentCollector extends BaseCollector {
   }
 
   /**
-   * Gemini Vision으로 슬라이드 이미지 분석
+   * z.ai GLM-4.6V Vision으로 슬라이드 이미지 분석
    */
   private async analyzeSlideImage(
     imagePath: string,
@@ -228,22 +229,24 @@ export class DocumentCollector extends BaseCollector {
       const ext = extname(imagePath).slice(1).toLowerCase();
       const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64,
-                  },
-                },
-                {
-                  text: `이 슬라이드(${fileName}, ${slideNumber}번째)를 분석해주세요.
+      const res = await fetch(ZAI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ZAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: ZAI_VISION_MODEL,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType};base64,${base64}` },
+              },
+              {
+                type: 'text',
+                text: `이 슬라이드(${fileName}, ${slideNumber}번째)를 분석해주세요.
 
 다음 정보를 추출해주세요:
 1. 슬라이드 제목
@@ -254,24 +257,23 @@ export class DocumentCollector extends BaseCollector {
 
 빈 슬라이드거나 내용이 거의 없으면 "EMPTY_SLIDE"라고만 답해주세요.
 한국어로 답변하되, 기술 용어는 원문 유지.`,
-                },
-              ],
-            }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 2048,
-            },
-          }),
-        },
-      );
+              },
+            ],
+          }],
+          max_tokens: 4000,
+        }),
+      });
 
       if (!res.ok) {
-        console.warn(`[Document] Gemini Vision 에러 (slide ${slideNumber}): ${res.status}`);
+        console.warn(`[Document] z.ai Vision 에러 (slide ${slideNumber}): ${res.status}`);
         return null;
       }
 
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const data = await res.json() as {
+        choices?: { message: { content?: string; reasoning_content?: string } }[];
+      };
+      const msg = data.choices?.[0]?.message;
+      const text = msg?.content?.trim() || msg?.reasoning_content?.trim() || '';
 
       if (!text || text.includes('EMPTY_SLIDE')) return null;
       return `## 슬라이드 ${slideNumber}\n\n${text}`;
