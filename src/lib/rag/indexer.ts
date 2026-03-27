@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { smartChunk, type SourceType as RagSourceType } from '@side/rag-core';
 import { getEmbeddingProvider } from './embedding';
 import { summarizeContent } from '@/lib/llm';
 import { createHash } from 'crypto';
@@ -31,26 +30,30 @@ function computeHash(content: string): string {
 }
 
 const MIN_CONTENT_LENGTH = 10;
+const CHUNK_SIZE = 1500;
 
-/** Prisma SourceType → rag-core SourceType 매핑 */
-function toRagSourceType(sourceType: SourceType): RagSourceType {
-  const map: Record<string, RagSourceType> = {
-    WEB_CRAWL: 'WEB_CRAWL',
-    YOUTUBE_CHANNEL: 'YOUTUBE',
-    RSS_FEED: 'RSS_FEED',
-    GITHUB_REPO: 'GITHUB_REPO',
-    DOCUMENT_FILE: 'DOCUMENT',
-    GOOGLE_WORKSPACE: 'DOCUMENT',
-    NOTION_PAGE: 'DOCUMENT',
-    MOLTBOOK: 'DOCUMENT',
-    GMAIL: 'DOCUMENT',
-    GOOGLE_CALENDAR: 'GENERIC',
-    GOOGLE_CHAT: 'GENERIC',
-    GIT_CLONE: 'GITHUB_REPO',
-    API_INGEST: 'API_INGEST',
-    DATABASE: 'GENERIC',
-  };
-  return map[sourceType] ?? 'GENERIC';
+/** 줄 단위 청킹 */
+function chunkByLines(text: string, maxLen: number): { text: string; index: number }[] {
+  const lines = text.split('\n');
+  const chunks: { text: string; index: number }[] = [];
+  let buf = '';
+  let idx = 0;
+
+  for (const line of lines) {
+    if (buf.length + line.length + 1 > maxLen && buf.length > 0) {
+      chunks.push({ text: buf.trim(), index: idx++ });
+      buf = '';
+    }
+    buf += (buf ? '\n' : '') + line;
+  }
+  if (buf.trim()) chunks.push({ text: buf.trim(), index: idx });
+  return chunks;
+}
+
+/** 소스 타입별 스마트 청킹 */
+function smartChunk(content: string, opts: { sourceType: string }): { text: string; index: number }[] {
+  if (content.length <= CHUNK_SIZE) return [{ text: content, index: 0 }];
+  return chunkByLines(content, CHUNK_SIZE);
 }
 
 export async function indexItem(item: IndexableItem, options: IndexOptions = {}): Promise<'new' | 'updated' | 'skipped'> {
@@ -158,10 +161,9 @@ async function generateSummary(title: string, content: string, sourceType: strin
 
 /** 청크만 생성 (임베딩 없이) - 배치 후처리용 */
 async function createChunksOnly(documentId: string, content: string, sourceType: SourceType): Promise<void> {
-  const ragSourceType = toRagSourceType(sourceType);
-  const chunks = smartChunk(content, { sourceType: ragSourceType });
+  const chunks = smartChunk(content, { sourceType });
 
-  console.log(`[Indexer] smartChunk(${ragSourceType}): ${content.length}자 → ${chunks.length}개 청크`);
+  console.log(`[Indexer] smartChunk(${sourceType}): ${content.length}자 → ${chunks.length}개 청크`);
 
   await Promise.all(
     chunks.map((chunk) =>
@@ -179,10 +181,9 @@ async function createChunksOnly(documentId: string, content: string, sourceType:
 
 /** 청크 생성 + 임베딩 + Qdrant 적재 (동기식) */
 async function createAndEmbedChunks(documentId: string, content: string, sourceType: SourceType, title?: string): Promise<void> {
-  const ragSourceType = toRagSourceType(sourceType);
-  const chunks = smartChunk(content, { sourceType: ragSourceType });
+  const chunks = smartChunk(content, { sourceType });
 
-  console.log(`[Indexer] smartChunk(${ragSourceType}): ${content.length}자 → ${chunks.length}개 청크`);
+  console.log(`[Indexer] smartChunk(${sourceType}): ${content.length}자 → ${chunks.length}개 청크`);
 
   const createdChunks = await Promise.all(
     chunks.map((chunk) =>

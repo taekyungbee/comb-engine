@@ -27,7 +27,6 @@
     "@notionhq/client": "^2.2.0",
     "@prisma/client": "^6.5.0",
     "@qdrant/js-client-rest": "^1.17.0",
-    "@side/rag-core": "workspace:*",
     "bcrypt": "^6.0.0",
     "cheerio": "^1.0.0",
     "jsonwebtoken": "^9.0.3",
