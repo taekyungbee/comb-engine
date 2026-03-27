@@ -26,6 +26,13 @@ RUN pnpm install
 # Prisma 클라이언트 생성
 RUN pnpm exec prisma generate
 
+# 옵셔널 DB 드라이버 stub (빌드 시 resolve용, 런타임에 dynamic import)
+RUN mkdir -p node_modules/oracledb node_modules/pg node_modules/mysql2 && \
+    echo "module.exports = {}" > node_modules/oracledb/index.js && \
+    echo "module.exports = {}" > node_modules/pg/index.js && \
+    echo "module.exports = { createConnection: () => {} }" > node_modules/mysql2/promise.js && \
+    echo "module.exports = {}" > node_modules/mysql2/index.js
+
 # Next.js 빌드
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
