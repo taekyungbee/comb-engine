@@ -98,7 +98,7 @@ export async function searchSimilar(
     }
   }
 
-  // 합집합 (중복 제거)
+  // 합집합 (ID 중복 제거)
   const seenIds = new Set<string | number>();
   const combined: CandidatePoint[] = [];
 
@@ -123,14 +123,41 @@ export async function searchSimilar(
     }
   }
 
-  // Reranker로 최종 순위 결정
-  const reranked = await rerank(query, combined, limit);
+  // 빈 content 제거 (노이즈)
+  const validCombined = combined.filter((p) => {
+    const content = (p.payload.content as string) || '';
+    return content.trim().length >= 10;
+  });
+
+  // Reranker로 최종 순위 결정 (넉넉히 가져온 뒤 점수 기반 필터링)
+  const reranked = await rerank(query, validCombined, limit * 2);
+
+  // Reranker 점수 기반 동적 필터링
+  // - top-1은 항상 포함
+  // - 나머지는 top-1 대비 30% 이상인 것만 포함 (노이즈 제거)
+  const RERANKER_RATIO_THRESHOLD = 0.5;
+  const RERANKER_MIN_SCORE = 0.1; // sigmoid 기반 절대 최소
+  const filtered: CandidatePoint[] = [];
+  if (reranked.length > 0) {
+    const topScore = reranked[0].score;
+    for (const point of reranked) {
+      if (filtered.length === 0) {
+        filtered.push(point); // top-1 항상 포함
+      } else if (
+        point.score >= topScore * RERANKER_RATIO_THRESHOLD &&
+        point.score >= RERANKER_MIN_SCORE &&
+        filtered.length < limit
+      ) {
+        filtered.push(point);
+      }
+    }
+  }
 
   // SearchResult로 변환 (제어 문자 제거)
   // eslint-disable-next-line no-control-regex
   const sanitize = (s: string) => s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 
-  const results: SearchResult[] = reranked.map((point) => ({
+  const results: SearchResult[] = filtered.map((point) => ({
     chunkId: (point.payload.chunk_id as string) || String(point.id),
     documentId: (point.payload.document_id as string) || '',
     content: sanitize((point.payload.content as string) || ''),

@@ -95,29 +95,52 @@ async function search(query: string): Promise<Array<{ content: string; title: st
     } catch { /* ignore */ }
   }
 
-  // 합집합
+  // 합집합 (title dedup + 빈 content 제거)
   const seen = new Set<string | number>();
+  const seenTitles = new Map<string, number>();
   const combined: Array<{ content: string; title: string }> = [];
+
+  const addPoint = (id: string | number, score: number, content: string, title: string) => {
+    if (seen.has(id)) return;
+    if (content.trim().length < 10) return;
+    seen.add(id);
+    const existing = seenTitles.get(title);
+    if (existing !== undefined && existing >= score) return;
+    seenTitles.set(title, score);
+    combined.push({ content, title });
+  };
+
   for (const p of hybridResults.points) {
-    if (!seen.has(p.id)) {
-      seen.add(p.id);
-      const pay = (p.payload ?? {}) as Record<string, unknown>;
-      combined.push({ content: (pay.content as string) || '', title: (pay.title as string) || '' });
-    }
+    const pay = (p.payload ?? {}) as Record<string, unknown>;
+    addPoint(p.id, p.score ?? 0, (pay.content as string) || '', (pay.title as string) || '');
   }
   for (const p of keywordPoints) {
-    if (!seen.has(p.id)) {
-      seen.add(p.id);
-      combined.push({ content: (p.payload.content as string) || '', title: (p.payload.title as string) || '' });
-    }
+    addPoint(p.id, p.score, (p.payload.content as string) || '', (p.payload.title as string) || '');
   }
 
   // Reranker
   const reranked = await rerank(query, combined.map((c) => c.content));
-  return reranked.map((r) => ({
-    ...combined[r.index],
-    score: r.score,
-  }));
+
+  // Reranker 점수 기반 동적 필터링 (노이즈 제거)
+  const RERANKER_RATIO = 0.5;
+  const RERANKER_MIN = 0.1;
+  const filtered: Array<{ content: string; title: string; score: number }> = [];
+  if (reranked.length > 0) {
+    const topScore = reranked[0].score;
+    for (const r of reranked) {
+      if (filtered.length === 0) {
+        filtered.push({ ...combined[r.index], score: r.score });
+      } else if (
+        r.score >= topScore * RERANKER_RATIO &&
+        r.score >= RERANKER_MIN &&
+        filtered.length < TOP_K
+      ) {
+        filtered.push({ ...combined[r.index], score: r.score });
+      }
+    }
+  }
+
+  return filtered;
 }
 
 /** 간이 CP: GT 키워드가 top-K 중 몇 번째에 처음 등장하는지 (1/rank) */
