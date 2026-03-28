@@ -48,3 +48,11 @@ docker-compose.override.yml
 
 # Uploads
 /uploads/
+
+# 임시 스크립트 (보강/롤백 등 일회성)
+scripts/enrich-metadata*.ts
+scripts/rollback-enrichment.ts
+scripts/fix-sparse-vectors.ts
+
+# Playwright MCP
+.playwright-mcp/
