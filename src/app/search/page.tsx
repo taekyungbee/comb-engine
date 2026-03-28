@@ -29,8 +29,6 @@ export default function SearchPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('rag_token') : null;
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -51,11 +49,6 @@ export default function SearchPage() {
   };
 
   const handleUpload = async () => {
-    if (!token) {
-      setUploadResult('로그인이 필요합니다.');
-      return;
-    }
-
     setUploading(true);
     setUploadResult('');
 
@@ -70,7 +63,6 @@ export default function SearchPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             title: uploadTitle,
@@ -100,7 +92,6 @@ export default function SearchPage() {
 
         const res = await fetch('/api/ingest', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
         const data = await res.json();

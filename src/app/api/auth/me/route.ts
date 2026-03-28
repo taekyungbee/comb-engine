@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     if (!authUser) {
       return NextResponse.json(
         { success: false, error: { message: '인증이 필요합니다.', code: 'UNAUTHORIZED' } },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     console.error('Get me error:', error);
     return NextResponse.json(
       { success: false, error: { message: '사용자 조회 중 오류가 발생했습니다.', code: 'INTERNAL_ERROR' } },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

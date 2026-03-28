@@ -18,16 +18,11 @@ export default function ApiKeysPage() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('rag_token') : null;
-
   const fetchKeys = useCallback(async () => {
-    if (!token) return;
-    const res = await fetch('/api/api-keys', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch('/api/api-keys');
     const data = await res.json();
     if (data.success) setKeys(data.data);
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchKeys();
@@ -40,10 +35,7 @@ export default function ApiKeysPage() {
 
     const res = await fetch('/api/api-keys', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: newKeyName,
         ...(expiresInDays ? { expiresInDays: Number(expiresInDays) } : {}),
@@ -64,27 +56,14 @@ export default function ApiKeysPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('이 API Key를 삭제하시겠습니까?')) return;
 
-    await fetch(`/api/api-keys/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await fetch(`/api/api-keys/${id}`, { method: 'DELETE' });
     fetchKeys();
   };
-
-  if (!token) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">로그인이 필요합니다.</p>
-        <a href="/settings" className="text-blue-600 hover:underline">Settings에서 로그인</a>
-      </div>
-    );
-  }
 
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">API Keys</h2>
 
-      {/* 생성 폼 */}
       <div className="card p-4 mb-6">
         <h3 className="font-semibold mb-3">새 API Key 생성</h3>
         <div className="flex gap-3 items-end">
@@ -115,7 +94,6 @@ export default function ApiKeysPage() {
         {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
       </div>
 
-      {/* 생성된 키 표시 */}
       {createdKey && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4 mb-6">
           <p className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2">
@@ -127,7 +105,6 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      {/* 키 목록 */}
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead>

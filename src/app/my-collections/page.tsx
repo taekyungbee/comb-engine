@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 interface Collection {
   id: string;
@@ -21,16 +22,13 @@ export default function MyCollectionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('rag_token') : null;
+  const { data: session } = useSession();
 
   const fetchCollections = useCallback(async () => {
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    const res = await fetch('/api/collections/manage', { headers });
+    const res = await fetch('/api/collections/manage');
     const data = await res.json();
     if (data.success) setCollections(data.data);
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchCollections();
@@ -47,7 +45,6 @@ export default function MyCollectionsPage() {
       method,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         name: formName,
@@ -78,7 +75,6 @@ export default function MyCollectionsPage() {
 
     await fetch(`/api/collections/manage/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     });
     fetchCollections();
   };
@@ -109,7 +105,7 @@ export default function MyCollectionsPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Collections</h2>
-        {token && (
+        {session && (
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
             className="btn-primary text-sm px-4 py-2"
@@ -190,7 +186,7 @@ export default function MyCollectionsPage() {
                   <span>{new Date(c.createdAt).toLocaleDateString('ko-KR')}</span>
                 </div>
               </div>
-              {token && (
+              {session && (
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(c)}
