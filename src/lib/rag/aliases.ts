@@ -92,6 +92,27 @@ export function getAliases(title: string, content: string): string {
 }
 
 /**
+ * alias 벡터용 임베딩 텍스트 생성
+ * 매칭되면: "코드명1 코드명2 한국어별칭1 한국어별칭2"
+ * 매칭 안 되면: title (일반 의미 검색용)
+ */
+export function getAliasEmbeddingText(title: string, content: string): string {
+  const matched: { code: string; aliases: string[] }[] = [];
+
+  for (const [pattern, aliasList] of Object.entries(ALIASES)) {
+    if (title.includes(pattern) || content.includes(pattern)) {
+      matched.push({ code: pattern, aliases: aliasList });
+    }
+  }
+
+  if (matched.length === 0) return title || 'unknown';
+
+  const codes = matched.map((m) => m.code).join(' ');
+  const aliasTexts = [...new Set(matched.flatMap((m) => m.aliases))].join(' ');
+  return `${codes} ${aliasTexts}`;
+}
+
+/**
  * 전체 별칭 사전 (스크립트에서 사용)
  */
 export function getAliasDict(): Record<string, string[]> {

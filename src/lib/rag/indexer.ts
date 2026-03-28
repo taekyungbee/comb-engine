@@ -3,6 +3,7 @@ import { getEmbeddingProvider } from './embedding';
 import { summarizeContent } from '@/lib/llm';
 import { createHash } from 'crypto';
 import { getQdrantClient, getCollectionName, textToSparse } from '@/lib/qdrant';
+import { getAliasEmbeddingText } from './aliases';
 import type { SourceType, Prisma } from '@prisma/client';
 
 export interface IndexableItem {
@@ -203,6 +204,10 @@ async function createAndEmbedChunks(documentId: string, content: string, sourceT
   const texts = createdChunks.map((c) => c.content);
   const embeddings = await provider.embedBatch(texts);
 
+  // alias 벡터용 임베딩 (코드명↔한국어 별칭 브릿지)
+  const aliasTexts = createdChunks.map((c) => getAliasEmbeddingText(title || '', c.content));
+  const aliasEmbeddings = await provider.embedBatch(aliasTexts);
+
   // Qdrant 적재
   try {
     const qdrant = getQdrantClient();
@@ -217,6 +222,7 @@ async function createAndEmbedChunks(documentId: string, content: string, sourceT
       vector: {
         dense: embeddings[i],
         text: textToSparse(chunk.content),
+        alias: aliasEmbeddings[i],
       },
       payload: {
         chunk_id: chunk.id,

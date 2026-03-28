@@ -58,7 +58,7 @@ export async function searchSimilar(
   }
   const filter = mustConditions.length > 0 ? { must: mustConditions } : undefined;
 
-  // Dense top-20 + Sparse top-20 → RRF fusion
+  // Dense top-20 + Sparse top-20 + Alias top-15 → RRF fusion
   const prefetch = [
     {
       query: queryVector,
@@ -70,6 +70,12 @@ export async function searchSimilar(
       query: sparse,
       using: 'text' as const,
       limit: 20,
+      ...(filter ? { filter } : {}),
+    },
+    {
+      query: queryVector, // 동일 벡터 재사용 (추가 임베딩 없음)
+      using: 'alias' as const,
+      limit: 15,
       ...(filter ? { filter } : {}),
     },
   ];
