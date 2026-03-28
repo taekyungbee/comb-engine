@@ -98,6 +98,8 @@ export async function searchSimilar(
     }
   }
 
+
+
   // 합집합 (ID 중복 제거)
   const seenIds = new Set<string | number>();
   const combined: CandidatePoint[] = [];
