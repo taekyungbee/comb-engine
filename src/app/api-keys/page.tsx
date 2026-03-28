@@ -54,7 +54,7 @@ export default function ApiKeysPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('이 API Key를 삭제하시겠습니까?')) return;
+    if (!confirm('이 API 키를 삭제하시겠습니까?')) return;
 
     await fetch(`/api/api-keys/${id}`, { method: 'DELETE' });
     fetchKeys();
@@ -62,44 +62,44 @@ export default function ApiKeysPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">API Keys</h2>
+      <h2 className="text-2xl font-bold mb-6">API 키 관리</h2>
 
       <div className="card p-4 mb-6">
-        <h3 className="font-semibold mb-3">새 API Key 생성</h3>
+        <h3 className="font-semibold mb-3">새 API 키 생성</h3>
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="text-sm text-gray-500 block mb-1">이름</label>
+            <label className="text-sm text-text-muted block mb-1">이름</label>
             <input
               type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="예: Claude Code, MCP Client"
-              className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+              className="input-field w-full"
             />
           </div>
           <div className="w-40">
-            <label className="text-sm text-gray-500 block mb-1">만료 (일)</label>
+            <label className="text-sm text-text-muted block mb-1">만료 (일)</label>
             <input
               type="number"
               value={expiresInDays}
               onChange={(e) => setExpiresInDays(e.target.value ? parseInt(e.target.value) : '')}
               placeholder="미설정: 무기한"
-              className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+              className="input-field w-full"
             />
           </div>
           <button onClick={handleCreate} className="btn-primary px-4 py-2">
             생성
           </button>
         </div>
-        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+        {error && <p className="text-error text-sm mt-2">{error}</p>}
       </div>
 
       {createdKey && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4 mb-6">
-          <p className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2">
-            API Key가 생성되었습니다. 이 키는 다시 확인할 수 없으니 안전하게 보관하세요.
+        <div className="bg-success/10 border border-success/30 rounded-md p-4 mb-6">
+          <p className="text-sm font-semibold text-success mb-2">
+            API 키가 생성되었습니다. 이 키는 다시 확인할 수 없으니 안전하게 보관하세요.
           </p>
-          <code className="block bg-white dark:bg-gray-900 p-2 rounded text-sm break-all">
+          <code className="block bg-bg-secondary p-2 rounded text-sm break-all">
             {createdKey}
           </code>
         </div>
@@ -108,7 +108,7 @@ export default function ApiKeysPage() {
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-gray-500 bg-gray-50 dark:bg-gray-800">
+            <tr className="text-left text-text-muted bg-bg-secondary">
               <th className="px-4 py-3">이름</th>
               <th className="px-4 py-3">키 접두사</th>
               <th className="px-4 py-3">마지막 사용</th>
@@ -120,32 +120,32 @@ export default function ApiKeysPage() {
           <tbody>
             {keys.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  생성된 API Key가 없습니다.
+                <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
+                  생성된 API 키가 없습니다.
                 </td>
               </tr>
             ) : (
               keys.map((k) => (
-                <tr key={k.id} className="border-t border-gray-100 dark:border-gray-800">
+                <tr key={k.id} className="border-t border-border">
                   <td className="px-4 py-3 font-medium">{k.name}</td>
                   <td className="px-4 py-3">
-                    <code className="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs">
+                    <code className="bg-white/5 px-2 py-0.5 rounded text-xs">
                       {k.keyPrefix}...
                     </code>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-text-muted">
                     {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString('ko-KR') : '-'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-text-muted">
                     {k.expiresAt ? new Date(k.expiresAt).toLocaleDateString('ko-KR') : '무기한'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-text-muted">
                     {new Date(k.createdAt).toLocaleDateString('ko-KR')}
                   </td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(k.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
+                      className="text-error hover:text-error/80 text-xs"
                     >
                       삭제
                     </button>

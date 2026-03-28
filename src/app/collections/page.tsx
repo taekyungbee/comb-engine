@@ -33,24 +33,24 @@ export default function CollectionsPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Collection History</h2>
+      <h2 className="text-2xl font-bold mb-6">수집 이력</h2>
 
       {runs.length === 0 ? (
-        <p className="text-gray-500 text-center py-8">No collection runs yet</p>
+        <p className="text-text-muted text-center py-8">수집 이력이 없습니다</p>
       ) : (
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500 bg-gray-50 dark:bg-gray-800">
-                <th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Found</th>
-                <th className="px-4 py-3">New</th>
-                <th className="px-4 py-3">Updated</th>
-                <th className="px-4 py-3">Skipped</th>
-                <th className="px-4 py-3">Started</th>
-                <th className="px-4 py-3">Duration</th>
+              <tr className="text-left text-text-muted bg-bg-secondary">
+                <th className="px-4 py-3">소스</th>
+                <th className="px-4 py-3">타입</th>
+                <th className="px-4 py-3">상태</th>
+                <th className="px-4 py-3">발견</th>
+                <th className="px-4 py-3">신규</th>
+                <th className="px-4 py-3">갱신</th>
+                <th className="px-4 py-3">건너뜀</th>
+                <th className="px-4 py-3">시작 시간</th>
+                <th className="px-4 py-3">소요 시간</th>
               </tr>
             </thead>
             <tbody>
@@ -59,7 +59,7 @@ export default function CollectionsPage() {
                   ? Math.round((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)
                   : null;
                 return (
-                  <tr key={run.id} className="border-t border-gray-100 dark:border-gray-800">
+                  <tr key={run.id} className="border-t border-border">
                     <td className="px-4 py-3">{run.source.name}</td>
                     <td className="px-4 py-3">{run.source.type}</td>
                     <td className="px-4 py-3">
@@ -69,11 +69,11 @@ export default function CollectionsPage() {
                     <td className="px-4 py-3">{run.itemsNew}</td>
                     <td className="px-4 py-3">{run.itemsUpdated}</td>
                     <td className="px-4 py-3">{run.itemsSkipped}</td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-text-muted">
                       {new Date(run.startedAt).toLocaleString('ko-KR')}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {duration !== null ? `${duration}s` : '-'}
+                    <td className="px-4 py-3 text-text-muted">
+                      {duration !== null ? `${duration}초` : '-'}
                     </td>
                   </tr>
                 );
@@ -90,9 +90,9 @@ export default function CollectionsPage() {
             disabled={page === 1}
             className="btn-outline text-sm"
           >
-            Prev
+            이전
           </button>
-          <span className="px-3 py-2 text-sm text-gray-500">
+          <span className="px-3 py-2 text-sm text-text-muted">
             {page} / {totalPages}
           </span>
           <button
@@ -100,7 +100,7 @@ export default function CollectionsPage() {
             disabled={page === totalPages}
             className="btn-outline text-sm"
           >
-            Next
+            다음
           </button>
         </div>
       )}
@@ -110,13 +110,13 @@ export default function CollectionsPage() {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    SUCCESS: 'bg-green-100 text-green-700',
-    PARTIAL: 'bg-yellow-100 text-yellow-700',
-    FAILED: 'bg-red-100 text-red-700',
-    RUNNING: 'bg-blue-100 text-blue-700',
+    SUCCESS: 'badge-success',
+    PARTIAL: 'badge-warning',
+    FAILED: 'badge-error',
+    RUNNING: 'badge-info',
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[status] || 'bg-gray-100'}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[status] || 'bg-white/5'}`}>
       {status}
     </span>
   );

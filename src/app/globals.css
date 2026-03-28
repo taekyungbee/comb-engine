@@ -1,72 +1,230 @@
 @import 'tailwindcss';
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 255, 255, 255;
-  --background-end-rgb: 245, 245, 245;
-  --font-pretendard: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui,
-    Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR',
-    sans-serif;
-}
+/* ================================================
+   LUDS: Lazybee Universal Design System
+   Applied to Comb Engine
+   ================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 15, 15, 15;
-    --background-end-rgb: 0, 0, 0;
-  }
+@theme {
+  /* Background - LUDS Deep Onyx */
+  --color-bg-primary: #181610;
+  --color-bg-secondary: #231e0f;
+  --color-bg-tertiary: #3a3527;
+
+  /* Text */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Accent - LUDS Honey Gold */
+  --color-accent-primary: #ffc932;
+  --color-accent-hover: #e6b41d;
+
+  /* Border */
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-hover: rgba(255, 201, 50, 0.3);
+
+  /* Status */
+  --color-success: #10b981;
+  --color-warning: #ffc932;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* LazyBee Honey */
+  --color-honey: rgb(255 200 50);
+
+  /* Typography */
+  --font-sans: "Space Grotesk", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Shadows */
+  --shadow-glow: 0 0 20px rgba(255, 201, 50, 0.2);
+  --shadow-honey: 0 0 30px rgba(255, 200, 50, 0.4);
+  --shadow-refraction: inset 0 0 20px rgba(255, 201, 51, 0.05), 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  font-family: var(--font-pretendard);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ================================================
+   LUDS Surface Utilities
+   ================================================ */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+}
+
+.glass-card-deep {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-refraction);
+}
+
+/* ================================================
+   Component Utilities
+   ================================================ */
+
 @utility card {
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
-  background-color: #fff;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
 }
 
 @utility btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  border-radius: 0.75rem;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   cursor: pointer;
 }
 
 @utility btn-primary {
   @apply btn;
-  background-color: #2563eb;
-  color: #fff;
-  &:hover { background-color: #1d4ed8; }
+  background-color: var(--color-accent-primary);
+  color: #181610;
+  &:hover { background-color: var(--color-accent-hover); box-shadow: var(--shadow-glow); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 @utility btn-secondary {
   @apply btn;
-  background-color: #f3f4f6;
-  color: #111827;
-  &:hover { background-color: #e5e7eb; }
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  &:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--color-border-hover); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 @utility btn-outline {
   @apply btn;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border);
   background-color: transparent;
-  &:hover { background-color: #f3f4f6; }
+  color: var(--color-text-secondary);
+  &:hover { border-color: var(--color-border-hover); color: var(--color-accent-primary); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+@utility btn-danger {
+  @apply btn;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  &:hover { background: rgba(239, 68, 68, 0.2); }
+}
+
+@utility input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+  &:focus { outline: none; border-color: var(--color-accent-primary); }
+  &::placeholder { color: var(--color-text-muted); }
+}
+
+@utility badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+@utility badge-success {
+  @apply badge;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+@utility badge-warning {
+  @apply badge;
+  background: rgba(255, 201, 50, 0.15);
+  color: var(--color-warning);
+}
+
+@utility badge-error {
+  @apply badge;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-error);
+}
+
+@utility badge-info {
+  @apply badge;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-info);
+}
+
+@utility badge-neutral {
+  @apply badge;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+}
+
+/* ================================================
+   Scrollbar
+   ================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-hover);
+  border-radius: 3px;
+}
+
+::selection {
+  background: rgba(255, 201, 50, 0.3);
+  color: var(--color-text-primary);
+}
+
+/* ================================================
+   Animations
+   ================================================ */
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 201, 50, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(255, 201, 50, 0.4); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 25%,
+    var(--color-bg-secondary) 50%,
+    var(--color-bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

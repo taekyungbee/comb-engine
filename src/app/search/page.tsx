@@ -114,15 +114,15 @@ export default function SearchPage() {
       <div className="flex gap-4 mb-6">
         <button
           onClick={() => setTab('search')}
-          className={`text-lg font-bold ${tab === 'search' ? '' : 'text-gray-400'}`}
+          className={`text-lg font-bold ${tab === 'search' ? '' : 'text-text-muted'}`}
         >
-          Vector Search
+          벡터 검색
         </button>
         <button
           onClick={() => setTab('upload')}
-          className={`text-lg font-bold ${tab === 'upload' ? '' : 'text-gray-400'}`}
+          className={`text-lg font-bold ${tab === 'upload' ? '' : 'text-text-muted'}`}
         >
-          Upload
+          업로드
         </button>
       </div>
 
@@ -133,16 +133,16 @@ export default function SearchPage() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search collected documents..."
-              className="flex-1 px-4 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-600"
+              placeholder="수집된 문서를 검색하세요..."
+              className="input-field flex-1"
             />
             <button type="submit" disabled={searching} className="btn-primary">
-              {searching ? 'Searching...' : 'Search'}
+              {searching ? '검색 중...' : '검색'}
             </button>
           </form>
 
           {searched && results.length === 0 && !searching && (
-            <p className="text-gray-500 text-center py-8">No results found</p>
+            <p className="text-text-muted text-center py-8">검색 결과가 없습니다</p>
           )}
 
           <div className="space-y-4">
@@ -152,14 +152,14 @@ export default function SearchPage() {
                   <div>
                     <h3 className="font-semibold">{result.title}</h3>
                     <div className="flex gap-2 mt-1">
-                      <span className="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700">
+                      <span className="px-2 py-0.5 rounded text-xs bg-white/5">
                         {result.sourceType}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        Similarity: {(result.similarity * 100).toFixed(1)}%
+                      <span className="text-xs text-text-muted">
+                        유사도: {(result.similarity * 100).toFixed(1)}%
                       </span>
                       {result.publishedAt && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-text-muted">
                           {new Date(result.publishedAt).toLocaleDateString('ko-KR')}
                         </span>
                       )}
@@ -170,13 +170,13 @@ export default function SearchPage() {
                       href={result.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-500 hover:underline"
+                      className="text-xs text-accent-primary hover:underline"
                     >
-                      Open
+                      열기
                     </a>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                <p className="text-sm text-text-secondary whitespace-pre-wrap">
                   {result.content}
                 </p>
               </div>
@@ -188,13 +188,13 @@ export default function SearchPage() {
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setUploadType('text')}
-              className={`px-3 py-1 text-sm rounded ${uploadType === 'text' ? 'bg-blue-100 text-blue-700' : 'text-gray-500'}`}
+              className={`px-3 py-1 text-sm rounded ${uploadType === 'text' ? 'badge-info' : 'text-text-muted'}`}
             >
               텍스트
             </button>
             <button
               onClick={() => setUploadType('image')}
-              className={`px-3 py-1 text-sm rounded ${uploadType === 'image' ? 'bg-blue-100 text-blue-700' : 'text-gray-500'}`}
+              className={`px-3 py-1 text-sm rounded ${uploadType === 'image' ? 'badge-info' : 'text-text-muted'}`}
             >
               이미지
             </button>
@@ -202,28 +202,28 @@ export default function SearchPage() {
 
           <div className="space-y-3">
             <div>
-              <label className="text-sm text-gray-500 block mb-1">제목</label>
+              <label className="text-sm text-text-muted block mb-1">제목</label>
               <input
                 type="text"
                 value={uploadTitle}
                 onChange={(e) => setUploadTitle(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                className="input-field w-full"
               />
             </div>
 
             {uploadType === 'text' ? (
               <div>
-                <label className="text-sm text-gray-500 block mb-1">내용</label>
+                <label className="text-sm text-text-muted block mb-1">내용</label>
                 <textarea
                   value={uploadContent}
                   onChange={(e) => setUploadContent(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                  className="input-field w-full"
                 />
               </div>
             ) : (
               <div>
-                <label className="text-sm text-gray-500 block mb-1">이미지 파일</label>
+                <label className="text-sm text-text-muted block mb-1">이미지 파일</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -234,13 +234,13 @@ export default function SearchPage() {
             )}
 
             <div>
-              <label className="text-sm text-gray-500 block mb-1">태그 (콤마 구분)</label>
+              <label className="text-sm text-text-muted block mb-1">태그 (콤마 구분)</label>
               <input
                 type="text"
                 value={uploadTags}
                 onChange={(e) => setUploadTags(e.target.value)}
                 placeholder="예: react, typescript"
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                className="input-field w-full"
               />
             </div>
 
@@ -253,7 +253,7 @@ export default function SearchPage() {
             </button>
 
             {uploadResult && (
-              <p className={`text-sm ${uploadResult.includes('오류') || uploadResult.includes('필요') ? 'text-red-500' : 'text-green-600'}`}>
+              <p className={`text-sm ${uploadResult.includes('오류') || uploadResult.includes('필요') ? 'text-error' : 'text-success'}`}>
                 {uploadResult}
               </p>
             )}

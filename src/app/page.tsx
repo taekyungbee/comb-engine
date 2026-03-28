@@ -30,27 +30,27 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-gray-500">Loading...</div>;
-  if (!stats) return <div className="text-red-500">Failed to load stats</div>;
+  if (loading) return <div className="text-text-muted">로딩 중...</div>;
+  if (!stats) return <div className="text-error">통계를 불러올 수 없습니다</div>;
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+      <h2 className="text-2xl font-bold mb-6">대시보드</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <StatCard title="Sources" value={stats.sources} />
-        <StatCard title="Documents" value={stats.documents} />
-        <StatCard title="Chunks" value={stats.chunks} />
+        <StatCard title="소스" value={stats.sources} />
+        <StatCard title="문서" value={stats.documents} />
+        <StatCard title="청크" value={stats.chunks} />
       </div>
 
       {stats.sourceBreakdown.length > 0 && (
         <div className="card p-4 mb-8">
-          <h3 className="font-semibold mb-3">Source Breakdown</h3>
+          <h3 className="font-semibold mb-3">소스 유형별 분포</h3>
           <div className="flex flex-wrap gap-2">
             {stats.sourceBreakdown.map((s) => (
               <span
                 key={s.sourceType}
-                className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 rounded-full"
+                className="px-3 py-1 text-sm bg-white/5 rounded-full"
               >
                 {s.sourceType}: {s.count}
               </span>
@@ -60,24 +60,24 @@ export default function DashboardPage() {
       )}
 
       <div className="card p-4">
-        <h3 className="font-semibold mb-3">Recent Collections</h3>
+        <h3 className="font-semibold mb-3">최근 수집 이력</h3>
         {stats.recentRuns.length === 0 ? (
-          <p className="text-gray-500 text-sm">No collections yet</p>
+          <p className="text-text-muted text-sm">수집 이력이 없습니다</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="pb-2">Source</th>
-                <th className="pb-2">Type</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">New</th>
-                <th className="pb-2">Updated</th>
-                <th className="pb-2">Time</th>
+              <tr className="text-left text-text-muted border-b border-border">
+                <th className="pb-2">소스</th>
+                <th className="pb-2">유형</th>
+                <th className="pb-2">상태</th>
+                <th className="pb-2">신규</th>
+                <th className="pb-2">갱신</th>
+                <th className="pb-2">시간</th>
               </tr>
             </thead>
             <tbody>
               {stats.recentRuns.map((run) => (
-                <tr key={run.id} className="border-b border-gray-100 dark:border-gray-800">
+                <tr key={run.id} className="border-b border-border">
                   <td className="py-2">{run.source.name}</td>
                   <td className="py-2">{run.source.type}</td>
                   <td className="py-2">
@@ -85,7 +85,7 @@ export default function DashboardPage() {
                   </td>
                   <td className="py-2">{run.itemsNew}</td>
                   <td className="py-2">{run.itemsUpdated}</td>
-                  <td className="py-2 text-gray-500">
+                  <td className="py-2 text-text-muted">
                     {new Date(run.startedAt).toLocaleString('ko-KR')}
                   </td>
                 </tr>
@@ -101,7 +101,7 @@ export default function DashboardPage() {
 function StatCard({ title, value }: { title: string; value: number }) {
   return (
     <div className="card p-4">
-      <p className="text-sm text-gray-500">{title}</p>
+      <p className="text-sm text-text-muted">{title}</p>
       <p className="text-3xl font-bold mt-1">{value.toLocaleString()}</p>
     </div>
   );
@@ -109,13 +109,13 @@ function StatCard({ title, value }: { title: string; value: number }) {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    SUCCESS: 'bg-green-100 text-green-700',
-    PARTIAL: 'bg-yellow-100 text-yellow-700',
-    FAILED: 'bg-red-100 text-red-700',
-    RUNNING: 'bg-blue-100 text-blue-700',
+    SUCCESS: 'badge-success',
+    PARTIAL: 'badge-warning',
+    FAILED: 'badge-error',
+    RUNNING: 'badge-info',
   };
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[status] || 'bg-gray-100'}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[status] || 'bg-white/5'}`}>
       {status}
     </span>
   );

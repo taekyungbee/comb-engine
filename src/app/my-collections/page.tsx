@@ -90,13 +90,18 @@ export default function MyCollectionsPage() {
 
   const visibilityBadge = (v: string) => {
     const colors: Record<string, string> = {
-      PRIVATE: 'bg-gray-100 text-gray-700',
-      SHARED: 'bg-blue-100 text-blue-700',
-      PUBLIC: 'bg-green-100 text-green-700',
+      PRIVATE: 'bg-white/10 text-text-secondary',
+      SHARED: 'badge-info',
+      PUBLIC: 'badge-success',
+    };
+    const labels: Record<string, string> = {
+      PRIVATE: '비공개',
+      SHARED: '팀 공유',
+      PUBLIC: '전체 공개',
     };
     return (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[v] || 'bg-gray-100'}`}>
-        {v}
+      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[v] || 'bg-white/5'}`}>
+        {labels[v] || v}
       </span>
     );
   };
@@ -104,7 +109,7 @@ export default function MyCollectionsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Collections</h2>
+        <h2 className="text-2xl font-bold">컬렉션 관리</h2>
         {session && (
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
@@ -123,33 +128,33 @@ export default function MyCollectionsPage() {
           </h3>
           <div className="space-y-3">
             <div>
-              <label className="text-sm text-gray-500 block mb-1">이름</label>
+              <label className="text-sm text-text-muted block mb-1">이름</label>
               <input
                 type="text"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                className="input-field w-full"
               />
             </div>
             <div>
-              <label className="text-sm text-gray-500 block mb-1">설명</label>
+              <label className="text-sm text-text-muted block mb-1">설명</label>
               <textarea
                 value={formDesc}
                 onChange={(e) => setFormDesc(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                className="input-field w-full"
               />
             </div>
             <div>
-              <label className="text-sm text-gray-500 block mb-1">가시성</label>
+              <label className="text-sm text-text-muted block mb-1">가시성</label>
               <select
                 value={formVisibility}
                 onChange={(e) => setFormVisibility(e.target.value)}
-                className="px-3 py-2 border rounded-md dark:bg-gray-800 dark:border-gray-700"
+                className="input-field"
               >
-                <option value="PRIVATE">Private - 본인만</option>
-                <option value="SHARED">Shared - 팀원 공유</option>
-                <option value="PUBLIC">Public - 전체 공개</option>
+                <option value="PRIVATE">비공개 - 본인만</option>
+                <option value="SHARED">팀 공유 - 팀원 공유</option>
+                <option value="PUBLIC">전체 공개</option>
               </select>
             </div>
             <div className="flex gap-2">
@@ -160,14 +165,14 @@ export default function MyCollectionsPage() {
                 취소
               </button>
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-error text-sm">{error}</p>}
           </div>
         </div>
       )}
 
       {/* 목록 */}
       {collections.length === 0 ? (
-        <p className="text-gray-500 text-center py-8">컬렉션이 없습니다.</p>
+        <p className="text-text-muted text-center py-8">컬렉션이 없습니다.</p>
       ) : (
         <div className="grid gap-4">
           {collections.map((c) => (
@@ -178,9 +183,9 @@ export default function MyCollectionsPage() {
                   {visibilityBadge(c.visibility)}
                 </div>
                 {c.description && (
-                  <p className="text-sm text-gray-500 mb-2">{c.description}</p>
+                  <p className="text-sm text-text-muted mb-2">{c.description}</p>
                 )}
-                <div className="text-xs text-gray-400 flex gap-3">
+                <div className="text-xs text-text-muted flex gap-3">
                   <span>{c._count.documents}개 문서</span>
                   <span>{c.owner.name}</span>
                   <span>{new Date(c.createdAt).toLocaleDateString('ko-KR')}</span>
@@ -190,13 +195,13 @@ export default function MyCollectionsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(c)}
-                    className="text-blue-500 hover:text-blue-700 text-xs"
+                    className="text-accent-primary hover:text-accent-primary/80 text-xs"
                   >
                     수정
                   </button>
                   <button
                     onClick={() => handleDelete(c.id)}
-                    className="text-red-500 hover:text-red-700 text-xs"
+                    className="text-error hover:text-error/80 text-xs"
                   >
                     삭제
                   </button>

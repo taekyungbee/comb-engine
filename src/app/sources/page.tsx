@@ -60,7 +60,7 @@ export default function SourcesPage() {
   };
 
   const handleDelete = async (sourceId: string) => {
-    if (!confirm('Delete this source and all its documents?')) return;
+    if (!confirm('이 소스와 관련 문서를 모두 삭제하시겠습니까?')) return;
     await fetch(`/api/sources/${sourceId}`, { method: 'DELETE' });
     loadSources();
   };
@@ -68,12 +68,12 @@ export default function SourcesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Sources</h2>
+        <h2 className="text-2xl font-bold">소스 관리</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
         >
-          {showForm ? 'Cancel' : 'Add Source'}
+          {showForm ? '취소' : '소스 추가'}
         </button>
       </div>
 
@@ -93,24 +93,24 @@ export default function SourcesPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{source.name}</h3>
-                  <span className="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700">
+                  <span className="px-2 py-0.5 rounded text-xs bg-white/5">
                     {source.type}
                   </span>
                   {!source.enabled && (
-                    <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-600">
-                      Disabled
+                    <span className="badge-error px-2 py-0.5 rounded text-xs">
+                      비활성
                     </span>
                   )}
                 </div>
                 {source.url && (
-                  <p className="text-sm text-gray-500 mt-1 truncate max-w-xl">{source.url}</p>
+                  <p className="text-sm text-text-muted mt-1 truncate max-w-xl">{source.url}</p>
                 )}
-                <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                  <span>Cron: {source.cronExpr || 'Manual'}</span>
-                  <span>Docs: {source._count.documents}</span>
-                  <span>Runs: {source._count.runs}</span>
+                <div className="flex gap-4 mt-2 text-xs text-text-muted">
+                  <span>스케줄: {source.cronExpr || '수동'}</span>
+                  <span>문서: {source._count.documents}</span>
+                  <span>실행: {source._count.runs}</span>
                   {source.lastRunAt && (
-                    <span>Last: {new Date(source.lastRunAt).toLocaleString('ko-KR')}</span>
+                    <span>최근: {new Date(source.lastRunAt).toLocaleString('ko-KR')}</span>
                   )}
                 </div>
               </div>
@@ -120,20 +120,20 @@ export default function SourcesPage() {
                   disabled={collecting === source.id}
                   className="btn-secondary text-xs"
                 >
-                  {collecting === source.id ? 'Collecting...' : 'Collect Now'}
+                  {collecting === source.id ? '수집 중...' : '지금 수집'}
                 </button>
                 <button
                   onClick={() => handleDelete(source.id)}
-                  className="btn-outline text-xs text-red-500"
+                  className="btn-outline text-xs text-error"
                 >
-                  Delete
+                  삭제
                 </button>
               </div>
             </div>
           </div>
         ))}
         {sources.length === 0 && (
-          <p className="text-gray-500 text-center py-8">No sources configured yet</p>
+          <p className="text-text-muted text-center py-8">등록된 소스가 없습니다</p>
         )}
       </div>
     </div>
@@ -177,21 +177,21 @@ function AddSourceForm({ onCreated }: { onCreated: () => void }) {
     <form onSubmit={handleSubmit} className="card p-4 mb-6 space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Name</label>
+          <label className="block text-sm font-medium mb-1">이름</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-600"
+            className="input-field w-full"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Type</label>
+          <label className="block text-sm font-medium mb-1">유형</label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-600"
+            className="input-field w-full"
           >
             {SOURCE_TYPES.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -205,34 +205,34 @@ function AddSourceForm({ onCreated }: { onCreated: () => void }) {
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-600"
+          className="input-field w-full"
           placeholder="https://..."
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Cron Expression</label>
+          <label className="block text-sm font-medium mb-1">Cron 표현식</label>
           <input
             type="text"
             value={cronExpr}
             onChange={(e) => setCronExpr(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-600"
-            placeholder="0 */6 * * * (every 6 hours)"
+            className="input-field w-full"
+            placeholder="0 */6 * * * (6시간마다)"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Config (JSON)</label>
+          <label className="block text-sm font-medium mb-1">설정 (JSON)</label>
           <input
             type="text"
             value={configJson}
             onChange={(e) => setConfigJson(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm dark:bg-gray-800 dark:border-gray-600"
+            className="input-field w-full"
             placeholder='{"maxItems": 50}'
           />
         </div>
       </div>
       <button type="submit" disabled={submitting || !name} className="btn-primary">
-        {submitting ? 'Creating...' : 'Create Source'}
+        {submitting ? '생성 중...' : '소스 생성'}
       </button>
     </form>
   );
