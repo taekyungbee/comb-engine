@@ -113,16 +113,20 @@ Query → bge-m3 임베딩 + sparse vector 생성
 임베딩, 마이그레이션, 대량 처리 등 시간이 오래 걸리는 작업은 로컬 PC가 아니라 맥미니에서 nohup으로 실행.
 
 ```bash
-# 1. 소스 push 후 맥미니에서 pull
+# 1. 로컬에서 소스 수정 + 커밋 + push
+git push origin develop
+
+# 2. 맥미니에서 pull (절대 맥미니에서 직접 소스 수정하지 않기!)
 ssh ai-server "cd ~/dev/projects/side/rag-collector && git pull origin develop"
 
-# 2. nohup으로 실행
+# 3. nohup으로 실행
 ssh ai-server "cd ~/dev/projects/side/rag-collector && nohup env OLLAMA_URL=http://localhost:11434 npx tsx scripts/xxx.ts > xxx.log 2>&1 &"
 
-# 3. 진행 확인
+# 4. 진행 확인
 ssh ai-server "tail -3 ~/dev/projects/side/rag-collector/xxx.log"
 ```
 
+- **맥미니에서 절대 소스 직접 수정 금지** — 반드시 로컬 수정 → push → pull 순서
 - 로컬에서 동일 작업 병렬 실행 금지 (Ollama 점유 충돌)
 - Ollama 배치 크기: 100 (content 기준)
 - z.ai Judge 평가(50TC)도 ~45분 걸리므로 맥미니에서 실행 권장
