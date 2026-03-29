@@ -125,12 +125,33 @@ ssh ai-server "tail -3 ~/dev/projects/side/rag-collector/xxx.log"
 
 - 로컬에서 동일 작업 병렬 실행 금지 (Ollama 점유 충돌)
 - Ollama 배치 크기: 100 (content 기준)
+- z.ai Judge 평가(50TC)도 ~45분 걸리므로 맥미니에서 실행 권장
+
+```bash
+# z.ai Judge 평가
+ssh ai-server "cd ~/dev/projects/side/rag-collector && nohup env ZAI_API_KEY=xxx OLLAMA_URL=http://localhost:11434 QDRANT_COLLECTION=rag_production_v2 npx tsx scripts/eval-50tc-judge.ts > eval-judge.log 2>&1 &"
+```
 
 ### 설계 확정 기준
 
 - 확정된 설계/설정값은 실행 중 임의 변경하지 않기
 - 새 스크립트 작성 시 기존 확정 설정을 반드시 참조
 - 확정값: EMBED_BATCH=100, SCROLL_BATCH=500, Reranker ratio=0.5
+
+### Vision(PPT/SB) 수집
+
+PPT/화면기획서를 슬라이드별 이미지로 변환 → z.ai Vision(GLM-4.6V) 분석 → 임베딩 → Qdrant 적재.
+
+```bash
+# Python 스크립트 (건건이 파이프라인, 중단 후 이어하기 지원)
+python3 scripts/sb-vision-ingest.py <pptx_path> --workers 4 --project komca
+
+# 또는 소스 등록 후 자동 수집 (document-collector, ZAI_API_KEY 필요)
+```
+
+- z.ai Vision: `ZAI_API_KEY` + `ZAI_VISION_MODEL=glm-4.6v`
+- LibreOffice로 슬라이드→이미지 변환 (서버에 설치 필요)
+- 빈 슬라이드 자동 스킵
 
 ### 환경변수
 
