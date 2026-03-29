@@ -14,7 +14,7 @@ const QDRANT_URL = process.env.QDRANT_URL || 'http://192.168.0.67:12333';
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://192.168.0.81:11434';
 const SRC_COLLECTION = 'rag_production';
 const DST_COLLECTION = 'rag_production_v2';
-const EMBED_BATCH = 20;
+const EMBED_BATCH = 100;
 
 const qdrant = new QdrantClient({ url: QDRANT_URL });
 
@@ -84,17 +84,31 @@ function getAliasText(title: string, content: string): string {
   return `${codes} ${aliasTexts}`;
 }
 
+async function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
 async function embedBatch(texts: string[]): Promise<number[][]> {
   const results: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBED_BATCH) {
     const batch = texts.slice(i, i + EMBED_BATCH);
-    const r = await fetch(`${OLLAMA_URL}/api/embed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'bge-m3', input: batch }),
-    });
-    const d = (await r.json()) as { embeddings: number[][] };
-    results.push(...d.embeddings);
+    for (let retry = 0; retry < 3; retry++) {
+      try {
+        const r = await fetch(`${OLLAMA_URL}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'bge-m3', input: batch }),
+        });
+        const d = (await r.json()) as { embeddings: number[][] };
+        results.push(...d.embeddings);
+        break;
+      } catch (e) {
+        if (retry < 2) {
+          console.warn(`  [임베딩 재시도 ${retry + 1}/3] ${e instanceof Error ? e.message : e}`);
+          await sleep(3000 * (retry + 1));
+        } else {
+          throw e;
+        }
+      }
+    }
   }
   return results;
 }

@@ -97,6 +97,7 @@ async function search(query: string): Promise<Array<{ content: string; title: st
     prefetch: [
       { query: vec, using: 'dense' as const, limit: 20 },
       { query: sparse, using: 'text' as const, limit: 20 },
+      { query: vec, using: 'alias' as const, limit: 15 },
     ],
     query: { fusion: 'rrf' as const },
     limit: TOP_K * 2,
@@ -118,26 +119,21 @@ async function search(query: string): Promise<Array<{ content: string; title: st
   }
 
   const seen = new Set<string | number>();
-  const seenTitles = new Map<string, number>();
   const combined: Array<{ content: string; title: string }> = [];
 
-  const addPoint = (id: string | number, score: number, content: string, title: string) => {
+  const addPoint = (id: string | number, content: string, title: string) => {
     if (seen.has(id)) return;
-    if (content.trim().length < 10) return; // 빈 content 제거
+    if (content.trim().length < 10) return;
     seen.add(id);
-    // 같은 title → 최고 점수 1개만 (노이즈 감소)
-    const existing = seenTitles.get(title);
-    if (existing !== undefined && existing >= score) return;
-    seenTitles.set(title, score);
     combined.push({ content, title });
   };
 
   for (const p of hybridResults.points) {
     const pay = (p.payload ?? {}) as Record<string, unknown>;
-    addPoint(p.id, p.score ?? 0, (pay.content as string) || '', (pay.title as string) || '');
+    addPoint(p.id, (pay.content as string) || '', (pay.title as string) || '');
   }
   for (const p of keywordPoints) {
-    addPoint(p.id, p.score, (p.payload.content as string) || '', (p.payload.title as string) || '');
+    addPoint(p.id, (p.payload.content as string) || '', (p.payload.title as string) || '');
   }
 
   const reranked = await rerank(query, combined.map((c) => c.content));
