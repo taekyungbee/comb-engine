@@ -39,8 +39,14 @@ export async function searchSimilar(
   // Sparse vector
   const sparse = textToSparse(query);
 
-  // 키워드 식별자 추출 (KOMCA-1796, TENV_SVCCD 등)
-  const identifiers = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  // 키워드 식별자 추출
+  // UPPER_CASE: KOMCA-1796, TENV_SVCCD, SP_DISTR_BATCH
+  // CamelCase: QsheetApi, SummaryLockManager, BillController
+  // API path: /api/v1/dist/imports/excel
+  const upperCase = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  const camelCase = query.match(/[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]*)+/g) || [];
+  const apiPaths = query.match(/\/api\/v\d+\/[\w/.-]+/g) || [];
+  const identifiers = [...new Set([...upperCase, ...camelCase, ...apiPaths])];
 
   // 필터 조건
   const mustConditions: Array<Record<string, unknown>> = [];

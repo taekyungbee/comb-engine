@@ -91,7 +91,11 @@ async function rerank(query: string, docs: string[]): Promise<Array<{ index: num
 async function search(query: string): Promise<Array<{ content: string; title: string; score: number }>> {
   const vec = await embed(query);
   const sparse = textToSparse(query);
-  const identifiers = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  // UPPER_CASE + CamelCase + API path
+  const upperCase = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  const camelCase = query.match(/[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]*)+/g) || [];
+  const apiPaths = query.match(/\/api\/v\d+\/[\w/.-]+/g) || [];
+  const identifiers = [...new Set([...upperCase, ...camelCase, ...apiPaths])];
 
   const hybridResults = await qdrant.query(COLLECTION, {
     prefetch: [
