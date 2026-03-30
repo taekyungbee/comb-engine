@@ -97,11 +97,18 @@ async function search(query: string): Promise<Array<{ content: string; title: st
   const apiPaths = query.match(/\/api\/v\d+\/[\w/.-]+/g) || [];
   const identifiers = [...new Set([...upperCase, ...camelCase, ...apiPaths])];
 
+  // API 키워드 감지 → API_ENDPOINT 부스트 prefetch 추가
+  const isApiQuery = /API|엔드포인트|endpoint|경로/i.test(query);
+  const apiBoost = isApiQuery
+    ? [{ query: vec, using: 'dense' as const, limit: 10, filter: { must: [{ key: 'title', match: { text: 'API_ENDPOINT' } }] } }]
+    : [];
+
   const hybridResults = await qdrant.query(COLLECTION, {
     prefetch: [
       { query: vec, using: 'dense' as const, limit: 20 },
       { query: sparse, using: 'text' as const, limit: 20 },
       { query: vec, using: 'alias' as const, limit: 15 },
+      ...apiBoost,
     ],
     query: { fusion: 'rrf' as const },
     limit: TOP_K * 2,

@@ -64,7 +64,13 @@ export async function searchSimilar(
   }
   const filter = mustConditions.length > 0 ? { must: mustConditions } : undefined;
 
-  // Dense top-20 + Sparse top-20 + Alias top-15 → RRF fusion
+  // API 키워드 감지 → API_INGEST 부스트 prefetch 추가
+  const isApiQuery = /API|엔드포인트|endpoint|경로/i.test(query);
+  const apiFilter = isApiQuery
+    ? { must: [{ key: 'title', match: { text: 'API_ENDPOINT' } }, ...(filter?.must || [])] }
+    : undefined;
+
+  // Dense top-20 + Sparse top-20 + Alias top-15 (+ API boost) → RRF fusion
   const prefetch = [
     {
       query: queryVector,
@@ -84,6 +90,13 @@ export async function searchSimilar(
       limit: 15,
       ...(filter ? { filter } : {}),
     },
+    // API 쿼리일 때 API_ENDPOINT 문서 전용 prefetch 추가
+    ...(apiFilter ? [{
+      query: queryVector,
+      using: 'dense' as const,
+      limit: 10,
+      filter: apiFilter,
+    }] : []),
   ];
 
   const hybridResults = await qdrant.query(collection, {
