@@ -127,7 +127,7 @@ async function search(query: string): Promise<Array<{ content: string; title: st
 
   const addPoint = (id: string | number, content: string, title: string) => {
     if (seen.has(id)) return;
-    if (content.trim().length < 10) return;
+    if (content.trim().length < 10 || title.trim().length === 0) return;
     seen.add(id);
     combined.push({ content, title });
   };

@@ -137,10 +137,11 @@ export async function searchSimilar(
     }
   }
 
-  // 빈 content 제거 (노이즈)
+  // 빈 content/title 제거 (노이즈)
   const validCombined = combined.filter((p) => {
     const content = (p.payload.content as string) || '';
-    return content.trim().length >= 10;
+    const title = (p.payload.title as string) || '';
+    return content.trim().length >= 10 && title.trim().length > 0;
   });
 
   // Reranker로 최종 순위 결정 (넉넉히 가져온 뒤 점수 기반 필터링)
