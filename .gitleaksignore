@@ -1,0 +1,8 @@
+# LAZ-521: gitleaks ignore rules
+# 테스트용 플레이스홀더 키는 무시
+**/e2e/**:generic-api-key
+**/e2e/**:gcp-api-key
+**/*.spec.ts:generic-api-key
+**/*.spec.ts:gcp-api-key
+# reference 디렉토리 (외부 샘플코드)
+reference/**
