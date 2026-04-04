@@ -19,4 +19,8 @@ RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAA
 
 EXPOSE 10800
 
+# root로 실행 금지 — 최소 권한 원칙
+RUN useradd -m -u 1000 nonroot
+USER nonroot
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10800"]
