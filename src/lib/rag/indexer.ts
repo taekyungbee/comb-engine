@@ -93,9 +93,46 @@ function chunkOracleProcedure(content: string): { text: string; index: number }[
   return chunks.filter((c) => c.text.length >= 20);
 }
 
+/**
+ * YouTube 타임스탬프 마커([MM:SS])로 분할 후 CHUNK_SIZE 초과 시 재분할
+ * 수집기에서 [MM:SS]\n{text} 형식으로 저장한 자막에 적용
+ */
+function chunkYouTubeByTimestamp(content: string): { text: string; index: number }[] {
+  // [MM:SS] 마커로 구간 분리
+  const sections = content.split(/\n(?=\[\d{2}:\d{2}\]\n)/);
+  const chunks: { text: string; index: number }[] = [];
+  let idx = 0;
+
+  for (const section of sections) {
+    const trimmed = section.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.length <= CHUNK_SIZE) {
+      chunks.push({ text: trimmed, index: idx++ });
+    } else {
+      // 5분 구간이 너무 긴 경우 줄 단위 재분할 (헤더 보존)
+      const headerMatch = trimmed.match(/^(\[\d{2}:\d{2}\]\n)/);
+      const header = headerMatch ? headerMatch[1] : '';
+      const body = header ? trimmed.slice(header.length) : trimmed;
+      const subChunks = chunkByLines(body, CHUNK_SIZE - header.length);
+      for (const sub of subChunks) {
+        chunks.push({ text: `${header}${sub.text}`, index: idx++ });
+      }
+    }
+  }
+
+  return chunks.length > 0 ? chunks : chunkByLines(content, CHUNK_SIZE);
+}
+
 /** 소스 타입별 스마트 청킹 */
 function smartChunk(content: string, opts: { sourceType: string }): { text: string; index: number }[] {
   if (content.length <= CHUNK_SIZE) return [{ text: content, index: 0 }];
+
+  // YouTube: [MM:SS] 타임스탬프 마커 기반 분할 (5분 단위 구간)
+  if (opts.sourceType === 'YOUTUBE_CHANNEL' && /\[\d{2}:\d{2}\]\n/.test(content)) {
+    const ytChunks = chunkYouTubeByTimestamp(content);
+    if (ytChunks.length > 1) return ytChunks;
+  }
 
   // Oracle 프로시저/함수: 논리 블록 단위 분할 (DATABASE + ORACLE_SCHEMA 모두 적용)
   if (['DATABASE', 'ORACLE_SCHEMA'].includes(opts.sourceType) && /(?:PROCEDURE|FUNCTION)/i.test(content)) {
