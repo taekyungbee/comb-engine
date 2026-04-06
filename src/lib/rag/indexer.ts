@@ -262,12 +262,9 @@ async function createAndEmbedChunks(documentId: string, content: string, sourceT
     const qdrant = getQdrantClient();
     const collection = getCollectionName();
 
-    // 현재 포인트 수로 ID 생성
-    const info = await qdrant.getCollection(collection);
-    const baseId = info.points_count ?? 0;
-
+    // chunk.id (UUID)를 Qdrant 포인트 ID로 사용 — 레이스 컨디션 없음, upsert 안전
     const points = createdChunks.map((chunk, i) => ({
-      id: baseId + i,
+      id: chunk.id,
       vector: {
         dense: embeddings[i],
         text: textToSparse(chunk.content),
