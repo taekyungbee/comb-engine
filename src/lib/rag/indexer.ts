@@ -51,9 +51,58 @@ function chunkByLines(text: string, maxLen: number): { text: string; index: numb
   return chunks;
 }
 
+/**
+ * Oracle 프로시저/함수를 논리 블록 단위로 분할
+ * 분할 기준: PROCEDURE/FUNCTION 헤더, IS/AS 선언부, BEGIN/END, EXCEPTION
+ */
+function chunkOracleProcedure(content: string): { text: string; index: number }[] {
+  // 시그니처 헤더 분리 (CREATE OR REPLACE ... IS/AS 이전)
+  const headerMatch = content.match(/^([\s\S]*?(?:PROCEDURE|FUNCTION)\s+\S+[\s\S]*?)(?:\s+(?:IS|AS)\s)/i);
+  const chunks: { text: string; index: number }[] = [];
+  let idx = 0;
+
+  if (!headerMatch) {
+    // 매칭 실패 시 줄 단위 청킹 fallback
+    return chunkByLines(content, CHUNK_SIZE);
+  }
+
+  const header = headerMatch[1].trim();
+  const rest = content.slice(headerMatch[0].length);
+
+  // 헤더 (선언부 포함 시그니처)
+  chunks.push({ text: header, index: idx++ });
+
+  // EXCEPTION 블록 분리
+  const exceptionIdx = rest.search(/\bEXCEPTION\b/i);
+  const bodyPart = exceptionIdx >= 0 ? rest.slice(0, exceptionIdx) : rest;
+  const exceptionPart = exceptionIdx >= 0 ? rest.slice(exceptionIdx) : '';
+
+  // 본문 — 1500자 초과 시 줄 단위 청킹
+  if (bodyPart.trim()) {
+    const bodyChunks = bodyPart.trim().length <= CHUNK_SIZE
+      ? [{ text: bodyPart.trim(), index: idx++ }]
+      : chunkByLines(bodyPart.trim(), CHUNK_SIZE).map((c) => ({ ...c, index: idx++ }));
+    chunks.push(...bodyChunks);
+  }
+
+  // EXCEPTION 블록
+  if (exceptionPart.trim()) {
+    chunks.push({ text: exceptionPart.trim(), index: idx++ });
+  }
+
+  return chunks.filter((c) => c.text.length >= 20);
+}
+
 /** 소스 타입별 스마트 청킹 */
-function smartChunk(content: string, _opts: { sourceType: string }): { text: string; index: number }[] {
+function smartChunk(content: string, opts: { sourceType: string }): { text: string; index: number }[] {
   if (content.length <= CHUNK_SIZE) return [{ text: content, index: 0 }];
+
+  // Oracle 프로시저/함수: 논리 블록 단위 분할 (DATABASE + ORACLE_SCHEMA 모두 적용)
+  if (['DATABASE', 'ORACLE_SCHEMA'].includes(opts.sourceType) && /(?:PROCEDURE|FUNCTION)/i.test(content)) {
+    const oracleChunks = chunkOracleProcedure(content);
+    if (oracleChunks.length > 1) return oracleChunks;
+  }
+
   return chunkByLines(content, CHUNK_SIZE);
 }
 
