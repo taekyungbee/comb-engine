@@ -42,7 +42,7 @@ export async function runCollection(sourceId: string): Promise<string> {
           tags: item.tags,
           publishedAt: item.publishedAt,
           projectId: source.projectId ?? undefined,
-        });
+        }, { deferAI: false });
 
         if (status === 'new') itemsNew++;
         else if (status === 'updated') itemsUpdated++;
