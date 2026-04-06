@@ -117,12 +117,24 @@ export class DatabaseCollector extends BaseCollector {
     const columns = (cols.rows ?? []) as string[][];
     if (columns.length === 0) return null;
 
+    // 컬럼 주석 조회 (RAG 품질 개선 — 컬럼 의미 파악)
+    const colComments = await conn.execute(
+      `SELECT column_name, comments FROM all_col_comments
+       WHERE owner = :owner AND table_name = :table AND comments IS NOT NULL`,
+      [schema, tableName],
+    );
+    const commentMap = new Map<string, string>(
+      ((colComments.rows ?? []) as string[][]).map(([col, cmt]) => [col, cmt])
+    );
+
     const columnList = columns
       .map(([name, type, len, nullable, def]) => {
         let col = `  ${name} ${type}`;
         if (['VARCHAR2', 'CHAR', 'NVARCHAR2'].includes(type)) col += `(${len})`;
         if (nullable === 'N') col += ' NOT NULL';
         if (def) col += ` DEFAULT ${def.trim()}`;
+        const cmt = commentMap.get(name);
+        if (cmt) col += ` -- ${cmt}`;
         return col;
       })
       .join('\n');
