@@ -7,23 +7,22 @@ export interface RateLimitConfig {
 
 const store = new Map<string, { count: number; resetAt: number }>();
 
-type AppRouteHandler = (request: NextRequest, context: any) => Promise<NextResponse> | NextResponse;
+type AppRouteHandler = (request: NextRequest, context: Record<string, unknown>) => Promise<NextResponse> | NextResponse;
 
 export function rateLimitMiddleware(config: Partial<RateLimitConfig> = {}) {
   const limit = config.limit || 1000;
   const windowMs = config.windowMs || 60000;
 
   return (handler: AppRouteHandler) => {
-    return async (request: NextRequest, context: any): Promise<NextResponse> => {
+    return async (request: NextRequest, context: Record<string, unknown>): Promise<NextResponse> => {
       const authHeader = request.headers.get('Authorization');
-      
-      let key = 'anonymous';
-      if (authHeader?.startsWith('ApiKey ')) {
-        key = authHeader.slice(7);
-      } else {
-        const ip = request.headers.get('x-forwarded-for') || 'anonymous';
-        key = ip;
-      }
+
+      const key = (() => {
+        if (authHeader?.startsWith('ApiKey ')) {
+          return authHeader.slice(7);
+        }
+        return request.headers.get('x-forwarded-for') || 'anonymous';
+      })();
 
       const now = Date.now();
       let record = store.get(key);

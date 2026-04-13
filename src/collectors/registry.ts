@@ -6,7 +6,8 @@ import { YouTubeCollector } from "./youtube-collector";
 import { GitHubCollector } from "./github-collector";
 import { NotionCollector } from "./notion-collector";
 import { DocumentCollector } from "./document-collector";
-import { MoltbookCollector } from "./moltbook-collector";
+// MoltbookCollector는 ai-trends-collector에서 수집/태깅 담당
+// import { MoltbookCollector } from "./moltbook-collector";
 import { GoogleWorkspaceCollector } from "./google-workspace-collector";
 import { GmailCollector } from "./gmail-collector";
 import { CalendarCollector } from "./calendar-collector";
