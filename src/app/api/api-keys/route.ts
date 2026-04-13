@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ success: true, data: keys });
+    const keysWithDisplay = keys.map(k => ({
+      ...k,
+      keyDisplay: k.keyPrefix ? `${k.keyPrefix}***${k.keyPrefix.slice(-4)}` : null
+    }));
+
+    return NextResponse.json({ success: true, data: keysWithDisplay });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(
@@ -60,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     // key는 생성 시에만 반환 (이후에는 조회 불가)
     return NextResponse.json(
-      { success: true, data: { ...apiKey, key } },
+      { success: true, data: { ...apiKey, key, keyDisplay: prefix ? `${prefix}***${prefix.slice(-4)}` : null } },
       { status: 201 }
     );
   } catch (error) {

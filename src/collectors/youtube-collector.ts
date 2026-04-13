@@ -183,26 +183,89 @@ export class YouTubeCollector extends BaseCollector {
   }
 }
 
-function parseTranscriptXml(xml: string): string {
-  const regex = /<text[^>]*>([^<]*)<\/text>/g;
-  const texts: string[] = [];
+/** XML 디코딩 */
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/\\n/g, ' ')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
+/** 초 → MM:SS 포맷 */
+function formatTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** XML 파싱 → 타임스탬프 세그먼트 배열 반환 */
+function parseTranscriptXmlSegments(xml: string): { startSec: number; text: string }[] {
+  const regex = /<text[^>]*\bstart="([^"]*)"[^>]*>([^<]*)<\/text>/g;
+  const segments: { startSec: number; text: string }[] = [];
   let match;
 
   while ((match = regex.exec(xml)) !== null) {
-    const text = match[1]
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&apos;/g, "'")
-      .replace(/\\n/g, ' ')
-      .replace(/\n/g, ' ')
-      .trim();
-    if (text.length > 0) texts.push(text);
+    const startSec = parseFloat(match[1]) || 0;
+    const text = decodeXmlEntities(match[2]);
+    if (text.length > 0) segments.push({ startSec, text });
   }
 
-  return texts.join(' ');
+  // start 속성 없는 경우 fallback (순서 보장)
+  if (segments.length === 0) {
+    const fallback = /<text[^>]*>([^<]*)<\/text>/g;
+    while ((match = fallback.exec(xml)) !== null) {
+      const text = decodeXmlEntities(match[1]);
+      if (text.length > 0) segments.push({ startSec: 0, text });
+    }
+  }
+
+  return segments;
+}
+
+/**
+ * 자막 세그먼트를 시간 윈도우 단위로 그룹화
+ * 기본 5분(300초) → 각 구간을 [MM:SS] 헤더로 구분
+ */
+function groupTranscriptByTime(
+  segments: { startSec: number; text: string }[],
+  windowSec = 300,
+): string {
+  if (segments.length === 0) return '';
+
+  const groups: { startSec: number; texts: string[] }[] = [];
+  let currentGroup: { startSec: number; texts: string[] } | null = null;
+
+  for (const seg of segments) {
+    if (!currentGroup || seg.startSec >= currentGroup.startSec + windowSec) {
+      currentGroup = { startSec: seg.startSec, texts: [] };
+      groups.push(currentGroup);
+    }
+    currentGroup.texts.push(seg.text);
+  }
+
+  return groups
+    .map((g) => `[${formatTime(g.startSec)}]\n${g.texts.join(' ')}`)
+    .join('\n\n');
+}
+
+/** 타임스탬프 그룹 포맷으로 반환 (단일 그룹이면 flat text) */
+function parseTranscriptXml(xml: string): string {
+  const segments = parseTranscriptXmlSegments(xml);
+  if (segments.length === 0) return '';
+
+  // 타임스탬프가 모두 0이면 flat text (타임스탬프 없는 자막)
+  const hasTimestamps = segments.some((s) => s.startSec > 0);
+  if (!hasTimestamps) {
+    return segments.map((s) => s.text).join(' ');
+  }
+
+  return groupTranscriptByTime(segments);
 }
 
 function extractVideoId(url: string): string | null {

@@ -1,18 +1,18 @@
-import type { SourceType } from '@prisma/client';
-import type { Collector } from './types';
-import { RssCollector } from './rss-collector';
-import { WebCrawlCollector } from './web-crawler';
-import { YouTubeCollector } from './youtube-collector';
-import { GitHubCollector } from './github-collector';
-import { NotionCollector } from './notion-collector';
-import { DocumentCollector } from './document-collector';
-import { MoltbookCollector } from './moltbook-collector';
-import { GoogleWorkspaceCollector } from './google-workspace-collector';
-import { GmailCollector } from './gmail-collector';
-import { CalendarCollector } from './calendar-collector';
-import { GoogleChatCollector } from './google-chat-collector';
-import { GitCloneCollector } from './git-clone-collector';
-import { DatabaseCollector } from './database-collector';
+import type { SourceType } from "@prisma/client";
+import type { Collector } from "./types";
+import { RssCollector } from "./rss-collector";
+import { WebCrawlCollector } from "./web-crawler";
+import { YouTubeCollector } from "./youtube-collector";
+import { GitHubCollector } from "./github-collector";
+import { NotionCollector } from "./notion-collector";
+import { DocumentCollector } from "./document-collector";
+import { MoltbookCollector } from "./moltbook-collector";
+import { GoogleWorkspaceCollector } from "./google-workspace-collector";
+import { GmailCollector } from "./gmail-collector";
+import { CalendarCollector } from "./calendar-collector";
+import { GoogleChatCollector } from "./google-chat-collector";
+import { GitCloneCollector } from "./git-clone-collector";
+import { DatabaseCollector } from "./database-collector";
 
 const collectors = new Map<SourceType, Collector>();
 
@@ -27,7 +27,7 @@ register(new YouTubeCollector());
 register(new GitHubCollector());
 register(new NotionCollector());
 register(new DocumentCollector());
-register(new MoltbookCollector());
+// register(new MoltbookCollector()); // ai-trends-collector에서 수집/태깅 담당
 register(new GoogleWorkspaceCollector());
 register(new GmailCollector());
 register(new CalendarCollector());

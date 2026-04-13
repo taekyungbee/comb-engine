@@ -39,8 +39,14 @@ export async function searchSimilar(
   // Sparse vector
   const sparse = textToSparse(query);
 
-  // 키워드 식별자 추출 (KOMCA-1796, TENV_SVCCD 등)
-  const identifiers = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  // 키워드 식별자 추출
+  // UPPER_CASE: KOMCA-1796, TENV_SVCCD, SP_DISTR_BATCH
+  // CamelCase: QsheetApi, SummaryLockManager, BillController
+  // API path: /api/v1/dist/imports/excel
+  const upperCase = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
+  const camelCase = query.match(/[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]*)+/g) || [];
+  const apiPaths = query.match(/\/api\/v\d+\/[\w/.-]+/g) || [];
+  const identifiers = [...new Set([...upperCase, ...camelCase, ...apiPaths])];
 
   // 필터 조건
   const mustConditions: Array<Record<string, unknown>> = [];
@@ -58,7 +64,13 @@ export async function searchSimilar(
   }
   const filter = mustConditions.length > 0 ? { must: mustConditions } : undefined;
 
-  // Dense top-20 + Sparse top-20 + Alias top-15 → RRF fusion
+  // API 키워드 감지 → API_INGEST 부스트 prefetch 추가
+  const isApiQuery = /API|엔드포인트|endpoint|경로/i.test(query);
+  const apiFilter = isApiQuery
+    ? { must: [{ key: 'title', match: { text: 'API_ENDPOINT' } }, ...(filter?.must || [])] }
+    : undefined;
+
+  // Dense top-20 + Sparse top-20 + Alias top-15 (+ API boost) → RRF fusion
   const prefetch = [
     {
       query: queryVector,
@@ -78,6 +90,13 @@ export async function searchSimilar(
       limit: 15,
       ...(filter ? { filter } : {}),
     },
+    // API 쿼리일 때 API_ENDPOINT 문서 전용 prefetch 추가
+    ...(apiFilter ? [{
+      query: queryVector,
+      using: 'dense' as const,
+      limit: 10,
+      filter: apiFilter,
+    }] : []),
   ];
 
   const hybridResults = await qdrant.query(collection, {
@@ -131,10 +150,11 @@ export async function searchSimilar(
     }
   }
 
-  // 빈 content 제거 (노이즈)
+  // 빈 content/title 제거 (노이즈)
   const validCombined = combined.filter((p) => {
     const content = (p.payload.content as string) || '';
-    return content.trim().length >= 10;
+    const title = (p.payload.title as string) || '';
+    return content.trim().length >= 10 && title.trim().length > 0;
   });
 
   // Reranker로 최종 순위 결정 (넉넉히 가져온 뒤 점수 기반 필터링)

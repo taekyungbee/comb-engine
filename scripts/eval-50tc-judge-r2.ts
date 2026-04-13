@@ -91,24 +91,12 @@ async function rerank(query: string, docs: string[]): Promise<Array<{ index: num
 async function search(query: string): Promise<Array<{ content: string; title: string; score: number }>> {
   const vec = await embed(query);
   const sparse = textToSparse(query);
-  // UPPER_CASE + CamelCase + API path
-  const upperCase = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
-  const camelCase = query.match(/[A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]*)+/g) || [];
-  const apiPaths = query.match(/\/api\/v\d+\/[\w/.-]+/g) || [];
-  const identifiers = [...new Set([...upperCase, ...camelCase, ...apiPaths])];
-
-  // API 키워드 감지 → API_ENDPOINT 부스트 prefetch 추가
-  const isApiQuery = /API|엔드포인트|endpoint|경로/i.test(query);
-  const apiBoost = isApiQuery
-    ? [{ query: vec, using: 'dense' as const, limit: 10, filter: { must: [{ key: 'title', match: { text: 'API_ENDPOINT' } }] } }]
-    : [];
+  const identifiers = query.match(/[A-Z][A-Z0-9_]{3,}(?:-\d+)?/g) || [];
 
   const hybridResults = await qdrant.query(COLLECTION, {
     prefetch: [
       { query: vec, using: 'dense' as const, limit: 20 },
       { query: sparse, using: 'text' as const, limit: 20 },
-      { query: vec, using: 'alias' as const, limit: 15 },
-      ...apiBoost,
     ],
     query: { fusion: 'rrf' as const },
     limit: TOP_K * 2,
@@ -130,21 +118,26 @@ async function search(query: string): Promise<Array<{ content: string; title: st
   }
 
   const seen = new Set<string | number>();
+  const seenTitles = new Map<string, number>();
   const combined: Array<{ content: string; title: string }> = [];
 
-  const addPoint = (id: string | number, content: string, title: string) => {
+  const addPoint = (id: string | number, score: number, content: string, title: string) => {
     if (seen.has(id)) return;
-    if (content.trim().length < 10 || title.trim().length === 0) return;
+    if (content.trim().length < 10) return; // 빈 content 제거
     seen.add(id);
+    // 같은 title → 최고 점수 1개만 (노이즈 감소)
+    const existing = seenTitles.get(title);
+    if (existing !== undefined && existing >= score) return;
+    seenTitles.set(title, score);
     combined.push({ content, title });
   };
 
   for (const p of hybridResults.points) {
     const pay = (p.payload ?? {}) as Record<string, unknown>;
-    addPoint(p.id, (pay.content as string) || '', (pay.title as string) || '');
+    addPoint(p.id, p.score ?? 0, (pay.content as string) || '', (pay.title as string) || '');
   }
   for (const p of keywordPoints) {
-    addPoint(p.id, (p.payload.content as string) || '', (p.payload.title as string) || '');
+    addPoint(p.id, p.score, (p.payload.content as string) || '', (p.payload.title as string) || '');
   }
 
   const reranked = await rerank(query, combined.map((c) => c.content));

@@ -117,12 +117,24 @@ export class DatabaseCollector extends BaseCollector {
     const columns = (cols.rows ?? []) as string[][];
     if (columns.length === 0) return null;
 
+    // 컬럼 주석 조회 (RAG 품질 개선 — 컬럼 의미 파악)
+    const colComments = await conn.execute(
+      `SELECT column_name, comments FROM all_col_comments
+       WHERE owner = :owner AND table_name = :table AND comments IS NOT NULL`,
+      [schema, tableName],
+    );
+    const commentMap = new Map<string, string>(
+      ((colComments.rows ?? []) as string[][]).map(([col, cmt]) => [col, cmt])
+    );
+
     const columnList = columns
       .map(([name, type, len, nullable, def]) => {
         let col = `  ${name} ${type}`;
         if (['VARCHAR2', 'CHAR', 'NVARCHAR2'].includes(type)) col += `(${len})`;
         if (nullable === 'N') col += ' NOT NULL';
         if (def) col += ` DEFAULT ${def.trim()}`;
+        const cmt = commentMap.get(name);
+        if (cmt) col += ` -- ${cmt}`;
         return col;
       })
       .join('\n');
@@ -133,12 +145,44 @@ export class DatabaseCollector extends BaseCollector {
     );
     const tableComment = (comments.rows?.[0]?.[0] as string) || '';
 
+    // 제약조건 조회 (PK/FK — 테이블 관계 파악용)
+    const constraints = await conn.execute(
+      `SELECT ac.constraint_type, ac.constraint_name, acc.column_name,
+              ac.r_owner, arc.table_name as r_table_name, arcc.column_name as r_column_name
+       FROM all_constraints ac
+       JOIN all_cons_columns acc ON ac.owner = acc.owner AND ac.constraint_name = acc.constraint_name
+       LEFT JOIN all_constraints arc ON ac.r_owner = arc.owner AND ac.r_constraint_name = arc.constraint_name
+       LEFT JOIN all_cons_columns arcc ON arc.owner = arcc.owner AND arc.constraint_name = arcc.constraint_name
+                                      AND acc.position = arcc.position
+       WHERE ac.owner = :owner AND ac.table_name = :table
+         AND ac.constraint_type IN ('P', 'R')
+       ORDER BY ac.constraint_type, acc.position`,
+      [schema, tableName],
+    ).catch(() => ({ rows: [] }));
+
+    const pkCols: string[] = [];
+    const fkLines: string[] = [];
+    for (const [ctype, , colName, rOwner, rTable, rCol] of (constraints.rows ?? []) as string[][]) {
+      if (ctype === 'P') {
+        pkCols.push(colName);
+      } else if (ctype === 'R' && rTable) {
+        const refSchema = rOwner !== schema ? `${rOwner}.` : '';
+        fkLines.push(`  FK ${colName} → ${refSchema}${rTable}(${rCol})`);
+      }
+    }
+
+    const constraintSection = [
+      pkCols.length > 0 ? `PK: ${pkCols.join(', ')}` : '',
+      ...fkLines,
+    ].filter(Boolean).join('\n');
+
     const content = [
       `[${tableName} | 스키마:${schema} | 유형:TABLE | 컬럼수:${columns.length}${tableComment ? ` | 설명:${tableComment}` : ''}]`,
       `[Oracle 테이블] ${schema}.${tableName}`,
       `컬럼 (${columns.length}개):`,
       columnList,
-    ].join('\n');
+      constraintSection ? `\n제약조건:\n${constraintSection}` : '',
+    ].filter(Boolean).join('\n');
 
     return {
       externalId: `${schema}.TABLE.${tableName}`,
