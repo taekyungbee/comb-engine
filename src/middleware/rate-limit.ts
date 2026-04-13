@@ -7,14 +7,16 @@ export interface RateLimitConfig {
 
 const store = new Map<string, { count: number; resetAt: number }>();
 
-type AppRouteHandler = (request: NextRequest, context: Record<string, unknown>) => Promise<NextResponse> | NextResponse;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AppRouteHandler = (request: NextRequest, context: any) => Promise<NextResponse> | NextResponse;
 
 export function rateLimitMiddleware(config: Partial<RateLimitConfig> = {}) {
   const limit = config.limit || 1000;
   const windowMs = config.windowMs || 60000;
 
   return (handler: AppRouteHandler) => {
-    return async (request: NextRequest, context: Record<string, unknown>): Promise<NextResponse> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return async (request: NextRequest, context: any): Promise<NextResponse> => {
       const authHeader = request.headers.get('Authorization');
 
       const key = (() => {
