@@ -6,6 +6,9 @@ import { embedImage } from '@/lib/rag/embedding';
 import { createHash } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { rateLimitMiddleware } from '@/middleware/rate-limit';
+
+const rateLimit = rateLimitMiddleware({ limit: 1000, windowMs: 60000 });
 
 // API를 통한 수집을 위한 가상 소스 찾기/생성 (projectId별 분리)
 async function getApiIngestSource(projectId?: string): Promise<string> {
@@ -28,7 +31,7 @@ async function getApiIngestSource(projectId?: string): Promise<string> {
   return source.id;
 }
 
-export async function POST(request: NextRequest) {
+async function handler(request: NextRequest) {
   try {
     const user = requireRole(await authenticateRequest(request), 'ADMIN', 'MEMBER');
 
@@ -53,6 +56,8 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = rateLimit(handler);
 
 async function handleTextIngest(request: NextRequest, userId: string) {
   const { title, content, url, tags, collectionId, projectId, metadata } = await request.json();
