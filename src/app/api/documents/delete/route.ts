@@ -14,7 +14,16 @@ interface DeleteRequest {
   sourceType?: SourceType;
   collectionId?: string;
   dryRun?: boolean;
+  /** 분할 batch 크기 (default 5000, min 100, max 20000). 큰 삭제(수만 건) 시 트랜잭션 timeout 회피. */
+  batchSize?: number;
+  /** 안전 max iteration (default 200). 무한 루프 방지. */
+  maxIterations?: number;
 }
+
+const DEFAULT_BATCH = 5000;
+const MIN_BATCH = 100;
+const MAX_BATCH = 20000;
+const DEFAULT_MAX_ITER = 200;
 
 /**
  * POST /api/documents/delete
@@ -28,6 +37,8 @@ interface DeleteRequest {
  *   sourceType?: SourceType      타입 단위 (API_INGEST 등)
  *   collectionId?: string        컬렉션 단위
  *   dryRun?: boolean             true면 카운트만 (default false)
+ *   batchSize?: number           분할 크기 (default 5000, max 20000) — 큰 삭제 시 timeout 회피
+ *   maxIterations?: number       안전 max iteration (default 200)
  *
  * Response:
  *   { success: true, data: {
@@ -35,6 +46,7 @@ interface DeleteRequest {
  *       documents: number,
  *       chunks: number,
  *       qdrantDeleted: number,
+ *       iterations: number,
  *       sampleTitles?: string[]   // dryRun일 때만
  *   }}
  */
@@ -43,7 +55,16 @@ async function handler(request: NextRequest) {
     requireRole(await authenticateRequest(request), 'ADMIN');
 
     const body = (await request.json()) as DeleteRequest;
-    const { tags, documentIds, projectId, sourceType, collectionId, dryRun = false } = body;
+    const {
+      tags,
+      documentIds,
+      projectId,
+      sourceType,
+      collectionId,
+      dryRun = false,
+      batchSize: rawBatchSize,
+      maxIterations: rawMaxIter,
+    } = body;
 
     if (
       !tags?.length &&
@@ -65,6 +86,12 @@ async function handler(request: NextRequest) {
       );
     }
 
+    const batchSize = Math.max(
+      MIN_BATCH,
+      Math.min(MAX_BATCH, rawBatchSize ?? DEFAULT_BATCH)
+    );
+    const maxIter = Math.max(1, rawMaxIter ?? DEFAULT_MAX_ITER);
+
     // Build where clause
     const where: Prisma.DocumentWhereInput = {};
     if (tags?.length) where.tags = { hasSome: tags };
@@ -73,74 +100,95 @@ async function handler(request: NextRequest) {
     if (sourceType) where.sourceType = sourceType;
     if (collectionId) where.collectionId = collectionId;
 
-    // 삭제 대상 + 소속 chunks
-    const targets = await prisma.document.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        chunks: { select: { id: true } },
-      },
-    });
-
-    const docIds = targets.map((d) => d.id);
-    const chunkIds = targets.flatMap((d) => d.chunks.map((c) => c.id));
-
+    // dryRun: 첫 batchSize만 select해서 sample 보여주고, 전체 count는 별도 쿼리
     if (dryRun) {
+      const [totalDocs, sample] = await Promise.all([
+        prisma.document.count({ where }),
+        prisma.document.findMany({
+          where,
+          select: { id: true, title: true, chunks: { select: { id: true } } },
+          take: 10,
+        }),
+      ]);
+      const totalChunks = await prisma.documentChunk.count({
+        where: { document: where },
+      });
       return NextResponse.json({
         success: true,
         data: {
           dryRun: true,
-          documents: docIds.length,
-          chunks: chunkIds.length,
-          sampleTitles: targets.slice(0, 10).map((d) => d.title),
+          documents: totalDocs,
+          chunks: totalChunks,
+          batchSize,
+          estimatedIterations: Math.ceil(totalDocs / batchSize),
+          sampleTitles: sample.map((d) => d.title),
         },
       });
     }
 
-    if (docIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: { dryRun: false, documents: 0, chunks: 0, qdrantDeleted: 0 },
-      });
-    }
+    // 분할 삭제 루프 — 매 iter마다 batchSize 만큼 select → Qdrant 삭제 → PG 삭제
+    const qdrant = getQdrantClient();
+    const collection = getCollectionName();
 
-    // Qdrant 정리: chunk_id payload 매칭
+    let totalDocs = 0;
+    let totalChunks = 0;
     let qdrantDeleted = 0;
-    if (chunkIds.length > 0) {
-      try {
-        const qdrant = getQdrantClient();
-        const collection = getCollectionName();
-        // Qdrant filter delete는 batch size 제한이 없지만 안전하게 1000개 단위 분할
-        const BATCH = 1000;
-        for (let i = 0; i < chunkIds.length; i += BATCH) {
-          const slice = chunkIds.slice(i, i + BATCH);
+    let iter = 0;
+
+    while (iter < maxIter) {
+      iter++;
+      const docs = await prisma.document.findMany({
+        where,
+        select: { id: true, chunks: { select: { id: true } } },
+        take: batchSize,
+      });
+
+      if (docs.length === 0) break;
+
+      const docIds = docs.map((d) => d.id);
+      const chunkIds = docs.flatMap((d) => d.chunks.map((c) => c.id));
+
+      // Qdrant 정리 (chunk_id payload 매칭) — 한 번에 보냄
+      if (chunkIds.length > 0) {
+        try {
           await qdrant.delete(collection, {
-            filter: {
-              must: [{ key: 'chunk_id', match: { any: slice } }],
-            },
+            filter: { must: [{ key: 'chunk_id', match: { any: chunkIds } }] },
             wait: true,
           });
-          qdrantDeleted += slice.length;
+          qdrantDeleted += chunkIds.length;
+        } catch (err) {
+          console.error(
+            `[Delete iter ${iter}] Qdrant 삭제 실패 (PG는 이어 진행):`,
+            err
+          );
         }
-      } catch (err) {
-        console.error('[Delete] Qdrant 삭제 실패 (PostgreSQL은 이어 진행):', err);
-        // qdrantDeleted는 0 또는 부분 진행분으로 남음 — 사용자가 차이로 인지
       }
-    }
 
-    // PostgreSQL DELETE — cascade로 document_chunks 자동 삭제
-    const deleted = await prisma.document.deleteMany({
-      where: { id: { in: docIds } },
-    });
+      // PostgreSQL DELETE (cascade로 chunks 자동)
+      const r = await prisma.document.deleteMany({
+        where: { id: { in: docIds } },
+      });
+      totalDocs += r.count;
+      totalChunks += chunkIds.length;
+
+      console.log(
+        `[Delete iter ${iter}] docs=${r.count} chunks=${chunkIds.length} (cumulative docs=${totalDocs})`
+      );
+
+      // batch가 가득 안 찼으면 다음 iter는 비어있음 — 조기 종료
+      if (docs.length < batchSize) break;
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         dryRun: false,
-        documents: deleted.count,
-        chunks: chunkIds.length,
+        documents: totalDocs,
+        chunks: totalChunks,
         qdrantDeleted,
+        iterations: iter,
+        batchSize,
+        truncated: iter >= maxIter,
       },
     });
   } catch (error) {
