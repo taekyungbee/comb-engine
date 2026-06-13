@@ -76,7 +76,11 @@ async function handleTextIngest(request: NextRequest, userId: string) {
   }
 
   const sourceId = await getApiIngestSource(projectId);
-  const externalId = createHash('sha256').update(`${title}:${Date.now()}`).digest('hex').slice(0, 32);
+  // 안정적 externalId: 같은 url(없으면 동일 content) 재수집 시 새 문서가 아니라 upsert되도록 한다.
+  // 기존 `${title}:${Date.now()}`는 매 호출 유니크라 indexItem의 sourceId_externalId 중복체크를
+  // 항상 빗나가 같은 페이지가 ingest마다 새 문서로 누적되는 문제가 있었다.
+  const identityKey = url ? `url:${url}` : `content:${content}`;
+  const externalId = createHash('sha256').update(identityKey).digest('hex').slice(0, 32);
 
   const result = await indexItem({
     sourceId,
