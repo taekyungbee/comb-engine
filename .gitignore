@@ -56,3 +56,4 @@ scripts/fix-sparse-vectors.ts
 
 # Playwright MCP
 .playwright-mcp/
+wiki/.obsidian/

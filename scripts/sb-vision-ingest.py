@@ -13,11 +13,17 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+except Exception:
+    pass
+
 OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434")
 QDRANT = os.getenv("QDRANT_URL", "http://192.168.0.67:12333")
 COLLECTION = os.getenv("QDRANT_COLLECTION", "rag_production")
 ZAI_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions"
-ZAI_KEY = "6cfa5d0dcf134a6a8e82bb1ff4209148.eN8PTh2q0o48VaYH"  # Coding Plan Pro
+ZAI_KEY = os.getenv("ZAI_API_KEY", "")  # z.ai Coding Plan — set ZAI_API_KEY in .env
 
 VISION_PROMPT = """이 슬라이드를 분석해주세요.
 1. 화면 ID와 제목
