@@ -153,6 +153,10 @@ def main():
     parser.add_argument("--dpi", type=int, default=150, help="PNG 해상도")
     args = parser.parse_args()
 
+    if not ZAI_KEY:
+        print("ERROR: ZAI_API_KEY 환경변수가 설정되지 않았습니다. .env 또는 환경변수로 설정 후 다시 실행하세요.")
+        sys.exit(1)
+
     if not os.path.exists(args.pptx):
         print(f"파일 없음: {args.pptx}")
         sys.exit(1)
