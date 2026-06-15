@@ -1,5 +1,7 @@
 # CLAUDE.md - Comb Engine
 
+> 캐스케이드: 전역 → 루트(`~/dev/projects/CLAUDE.md`) → `internal/CLAUDE.md` → `lazy/CLAUDE.md` → **이 파일**. 상위(언어/모델/Git/스택)는 반복 안 하고 comb-engine 고유만. 인프라 정본은 위키 `ref-infrastructure`·`ref-services-runbook`(Qdrant `:12333`, Coolify `:8000`).
+
 ## 프로젝트 개요
 
 팀용 RAG 인프라 서비스 (구 rag-collector). 다양한 소스에서 데이터를 수집하고, Qdrant 기반 벡터 검색으로 유사 문서를 조회.
