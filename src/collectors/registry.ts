@@ -14,6 +14,7 @@ import { CalendarCollector } from "./calendar-collector";
 import { GoogleChatCollector } from "./google-chat-collector";
 import { GitCloneCollector } from "./git-clone-collector";
 import { DatabaseCollector } from "./database-collector";
+import { BaaldaCollector } from "./baalda-collector";
 
 const collectors = new Map<SourceType, Collector>();
 
@@ -35,6 +36,7 @@ register(new CalendarCollector());
 register(new GoogleChatCollector());
 register(new GitCloneCollector());
 register(new DatabaseCollector());
+register(new BaaldaCollector());
 
 export function getCollector(type: SourceType): Collector {
   const collector = collectors.get(type);

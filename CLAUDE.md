@@ -57,7 +57,7 @@ pnpm db:studio     # Prisma Studio
 | 서비스         | 주소                                        | 비고                                  |
 | -------------- | ------------------------------------------- | ------------------------------------- |
 | **Qdrant**     | 192.168.0.67:12333                          | Docker, dev-server                    |
-| **Reranker**   | 192.168.0.67:10800                          | Docker, dev-server                    |
+| **Reranker**   | 192.168.0.67:10800                          | Coolify `comb-reranker` ← `services/reranker` |
 | **PostgreSQL** | 192.168.0.67:5433                           | dev-server                            |
 | **Ollama**     | 192.168.0.81:11434 (ai-server)              | Mac Mini M4, bge-m3                   |
 | **GitHub**     | github.com/taekyungbee/comb-engine          | private repo                          |
@@ -207,3 +207,5 @@ python3 scripts/sb-vision-ingest.py <pptx_path> --workers 4 --project komca
 | `GOOGLE_CLIENT_ID`     | Google OAuth                               |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth                               |
 | `ZAI_API_KEY`          | z.ai LLM Judge                             |
+| `BAALDA_MCP_TOKEN`     | baalda 수집기(BAALDA)용 MCP 토큰 (`mcp_…`)  |
+| `RERANKER_URL`         | 재순위 서비스 (`services/reranker`, :10800) |

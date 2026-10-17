@@ -19,6 +19,11 @@ export interface IndexableItem {
   publishedAt?: Date;
   collectionId?: string;
   projectId?: string;
+  /**
+   * (sourceId, externalId) 로 못 찾으면 같은 소스의 같은 title 문서(최신 1건)를 이 externalId 로 넘겨받아 갱신한다.
+   * 안정 externalId 를 도입하기 전(매 호출 임의 id)에 쌓인 문서를 중복 없이 흡수하기 위한 1회성 이주 경로.
+   */
+  adoptByTitle?: boolean;
 }
 
 export interface IndexOptions {
@@ -155,7 +160,7 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
   const contentHash = computeHash(item.content);
 
   // 중복 체크
-  const existing = await prisma.document.findUnique({
+  let existing = await prisma.document.findUnique({
     where: {
       sourceId_externalId: {
         sourceId: item.sourceId,
@@ -163,6 +168,21 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
       },
     },
   });
+
+  // 안정 externalId 이주: 같은 소스·같은 title 의 최신 문서를 이 externalId 로 넘겨받는다
+  if (!existing && item.adoptByTitle) {
+    const candidate = await prisma.document.findFirst({
+      where: { sourceId: item.sourceId, title: item.title },
+      orderBy: { collectedAt: 'desc' },
+    });
+    if (candidate) {
+      existing = await prisma.document.update({
+        where: { id: candidate.id },
+        data: { externalId: item.externalId },
+      });
+      console.log(`[Indexer] externalId 이주: "${item.title}" ${candidate.externalId ?? '(none)'} → ${item.externalId}`);
+    }
+  }
 
   if (existing) {
     if (existing.contentHash === contentHash) {
@@ -191,7 +211,12 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
     });
 
     const chunkContent = summary || item.content;
-    await createAndEmbedChunks(existing.id, chunkContent, item.sourceType, item.title);
+    await createAndEmbedChunks(existing.id, chunkContent, item.sourceType, {
+      title: item.title,
+      projectId: item.projectId ?? existing.projectId ?? undefined,
+      collectionId: item.collectionId ?? existing.collectionId ?? undefined,
+      url: item.url ?? existing.url ?? undefined,
+    });
     return 'updated';
   }
 
@@ -219,7 +244,12 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
   });
 
   const chunkContent = summary || item.content;
-  await createAndEmbedChunks(doc.id, chunkContent, item.sourceType, item.title);
+  await createAndEmbedChunks(doc.id, chunkContent, item.sourceType, {
+    title: item.title,
+    projectId: item.projectId,
+    collectionId: item.collectionId,
+    url: item.url,
+  });
   return 'new';
 }
 
@@ -234,8 +264,43 @@ async function generateSummary(title: string, content: string, sourceType: strin
   }
 }
 
+export interface ChunkPayloadContext {
+  title?: string;
+  projectId?: string | null;
+  collectionId?: string | null;
+  url?: string | null;
+}
+
+/**
+ * Qdrant 포인트 payload — 검색(search.ts)이 읽는 키와 재색인 스크립트(scripts/reindex-full.ts)가 같은 형식을 쓴다.
+ * project_id 는 검색의 프로젝트 필터 키이므로 반드시 넣는다(없으면 생략).
+ */
+export function buildChunkPayload(
+  chunk: { id: string; content: string },
+  documentId: string,
+  sourceType: SourceType,
+  ctx: ChunkPayloadContext,
+): Record<string, unknown> {
+  return {
+    chunk_id: chunk.id,
+    content: chunk.content,
+    title: ctx.title || '',
+    source_type: sourceType,
+    document_id: documentId,
+    ...(ctx.projectId ? { project_id: ctx.projectId } : {}),
+    ...(ctx.collectionId ? { collection_id: ctx.collectionId } : {}),
+    ...(ctx.url ? { url: ctx.url } : {}),
+  };
+}
+
 /** 청크 생성 + 임베딩 + Qdrant 적재 */
-async function createAndEmbedChunks(documentId: string, content: string, sourceType: SourceType, title?: string): Promise<void> {
+async function createAndEmbedChunks(
+  documentId: string,
+  content: string,
+  sourceType: SourceType,
+  ctx: ChunkPayloadContext,
+): Promise<void> {
+  const title = ctx.title;
   const chunks = smartChunk(content, { sourceType });
 
   console.log(`[Indexer] smartChunk(${sourceType}): ${content.length}자 → ${chunks.length}개 청크`);
@@ -275,13 +340,7 @@ async function createAndEmbedChunks(documentId: string, content: string, sourceT
         text: textToSparse(chunk.content),
         alias: aliasEmbeddings[i],
       },
-      payload: {
-        chunk_id: chunk.id,
-        content: chunk.content,
-        title: title || '',
-        source_type: sourceType,
-        document_id: documentId,
-      },
+      payload: buildChunkPayload(chunk, documentId, sourceType, ctx),
     }));
 
     await qdrant.upsert(collection, { points });
@@ -291,6 +350,27 @@ async function createAndEmbedChunks(documentId: string, content: string, sourceT
     // Qdrant 실패해도 pgvector에는 저장됨
   }
 
+}
+
+/**
+ * 문서 삭제 — Qdrant 포인트(document_id 필터) 먼저, 그 다음 Postgres(청크는 cascade).
+ * 수집기 전체 동기화에서 사라진 항목 정리용. Qdrant 삭제 실패는 던진다(Postgres 만 지워 고아를 만들지 않기 위해).
+ */
+export async function deleteDocuments(documentIds: string[]): Promise<{ documents: number; qdrantFiltered: number }> {
+  if (documentIds.length === 0) return { documents: 0, qdrantFiltered: 0 };
+  const qdrant = getQdrantClient();
+  const collection = getCollectionName();
+  const BATCH = 200;
+  for (let i = 0; i < documentIds.length; i += BATCH) {
+    const ids = documentIds.slice(i, i + BATCH);
+    await qdrant.delete(collection, {
+      wait: true,
+      filter: { must: [{ key: 'document_id', match: { any: ids } }] },
+    });
+  }
+  const res = await prisma.document.deleteMany({ where: { id: { in: documentIds } } });
+  console.log(`[Indexer] 문서 삭제: ${res.count}개 (Qdrant document_id 필터 ${documentIds.length}건)`);
+  return { documents: res.count, qdrantFiltered: documentIds.length };
 }
 
 export async function getIndexStats(projectId?: string) {

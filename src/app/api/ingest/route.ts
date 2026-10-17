@@ -60,7 +60,17 @@ async function handler(request: NextRequest) {
 export const POST = rateLimit(handler);
 
 async function handleTextIngest(request: NextRequest, userId: string) {
-  const { title, content, url, tags, collectionId, projectId, metadata } = await request.json();
+  const {
+    title,
+    content,
+    url,
+    tags,
+    collectionId,
+    projectId,
+    metadata,
+    externalId: givenExternalId,
+    adoptByTitle,
+  } = await request.json();
 
   if (!title || !content) {
     return NextResponse.json(
@@ -81,7 +91,14 @@ async function handleTextIngest(request: NextRequest, userId: string) {
   }
 
   const sourceId = await getApiIngestSource(projectId);
-  const externalId = createHash('sha256').update(`${title}:${Date.now()}`).digest('hex').slice(0, 32);
+  // 안정 externalId (LAZ-780): 호출자가 준 externalId > url 해시 > (레거시) title+시각.
+  // 레거시 방식은 매 호출 유니크라 같은 문서가 ingest 마다 새 문서로 누적됐다(위키 재수집 중복의 원인).
+  const externalId =
+    typeof givenExternalId === 'string' && givenExternalId.trim()
+      ? givenExternalId.trim().slice(0, 500)
+      : url
+        ? createHash('sha256').update(`url:${url}`).digest('hex').slice(0, 32)
+        : createHash('sha256').update(`${title}:${Date.now()}`).digest('hex').slice(0, 32);
 
   const result = await indexItem({
     sourceId,
@@ -94,9 +111,10 @@ async function handleTextIngest(request: NextRequest, userId: string) {
     metadata: metadata || {},
     collectionId,
     projectId,
+    adoptByTitle: adoptByTitle === true,
   });
 
-  return NextResponse.json({ success: true, data: { status: result } }, { status: 201 });
+  return NextResponse.json({ success: true, data: { status: result, externalId } }, { status: 201 });
 }
 
 async function handleImageIngest(request: NextRequest, userId: string) {

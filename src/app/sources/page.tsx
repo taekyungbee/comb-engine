@@ -28,6 +28,7 @@ const SOURCE_TYPES = [
   'GOOGLE_CHAT',
   'NOTION_PAGE',
   'MOLTBOOK',
+  'BAALDA',
 ] as const;
 
 export default function SourcesPage() {
