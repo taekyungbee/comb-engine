@@ -170,6 +170,7 @@ enum SourceType {
   FRONTEND_SOURCE
   DOCUMENT
   DATABASE
+  BAALDA
 }
 
 // =============================================
