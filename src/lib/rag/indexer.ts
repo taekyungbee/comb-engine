@@ -29,6 +29,8 @@ export interface IndexableItem {
 export interface IndexOptions {
   /** true면 요약만 스킵 (임베딩은 항상 실행) */
   skipSummary?: boolean;
+  /** Called before touching an existing document. Title adoption requires this check. */
+  authorizeDocument?: (document: { collectionId: string | null; projectId: string | null }) => Promise<void>;
 }
 
 function computeHash(content: string): string {
@@ -169,13 +171,17 @@ export async function indexItem(item: IndexableItem, options: IndexOptions = {})
     },
   });
 
-  // 안정 externalId 이주: 같은 소스·같은 title 의 최신 문서를 이 externalId 로 넘겨받는다
-  if (!existing && item.adoptByTitle) {
+  if (existing) {
+    await options.authorizeDocument?.(existing);
+  } else if (item.adoptByTitle) {
+    // 안정 externalId 이주: 같은 소스·같은 title 의 최신 문서를 이 externalId 로 넘겨받는다
+    if (!options.authorizeDocument) throw new Error('Title adoption requires document authorization');
     const candidate = await prisma.document.findFirst({
       where: { sourceId: item.sourceId, title: item.title },
       orderBy: { collectedAt: 'desc' },
     });
     if (candidate) {
+      await options.authorizeDocument(candidate);
       existing = await prisma.document.update({
         where: { id: candidate.id },
         data: { externalId: item.externalId },
@@ -353,7 +359,7 @@ async function createAndEmbedChunks(
 }
 
 /**
- * 문서 삭제 — Qdrant 포인트(document_id 필터) 먼저, 그 다음 Postgres(청크는 cascade).
+ * 문서 삭제 — Qdrant 포인트(document_id 필터 + 기존 청크 ID) 먼저, 그 다음 Postgres(청크는 cascade).
  * 수집기 전체 동기화에서 사라진 항목 정리용. Qdrant 삭제 실패는 던진다(Postgres 만 지워 고아를 만들지 않기 위해).
  */
 export async function deleteDocuments(documentIds: string[]): Promise<{ documents: number; qdrantFiltered: number }> {
@@ -363,10 +369,18 @@ export async function deleteDocuments(documentIds: string[]): Promise<{ document
   const BATCH = 200;
   for (let i = 0; i < documentIds.length; i += BATCH) {
     const ids = documentIds.slice(i, i + BATCH);
+    // Legacy /api/embed points may have only chunk_id (their point ID), with no document_id.
+    const chunks = await prisma.documentChunk.findMany({
+      where: { documentId: { in: ids } },
+      select: { id: true },
+    });
     await qdrant.delete(collection, {
       wait: true,
       filter: { must: [{ key: 'document_id', match: { any: ids } }] },
     });
+    for (let j = 0; j < chunks.length; j += BATCH) {
+      await qdrant.delete(collection, { wait: true, points: chunks.slice(j, j + BATCH).map((c) => c.id) });
+    }
   }
   const res = await prisma.document.deleteMany({ where: { id: { in: documentIds } } });
   console.log(`[Indexer] 문서 삭제: ${res.count}개 (Qdrant document_id 필터 ${documentIds.length}건)`);

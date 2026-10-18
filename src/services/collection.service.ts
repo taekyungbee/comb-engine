@@ -53,8 +53,20 @@ export async function runCollection(sourceId: string): Promise<string> {
       }
     }
 
-    // 전체 동기화: 소스에 더 이상 없는 항목의 문서를 정리한다 (수집기가 seenExternalIds 를 준 경우만)
     let itemsDeleted = 0;
+    if (result.deletedExternalIds?.length && errors.length === 0) {
+      try {
+        const empty = await prisma.document.findMany({
+          where: { sourceId: source.id, externalId: { in: result.deletedExternalIds } },
+          select: { id: true },
+        });
+        itemsDeleted += (await deleteDocuments(empty.map((d) => d.id))).documents;
+      } catch (error) {
+        errors.push(`Delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    // 전체 동기화: 소스에 더 이상 없는 항목의 문서를 정리한다 (수집기가 seenExternalIds 를 준 경우만)
     if (result.fullSync && result.seenExternalIds && errors.length === 0) {
       try {
         const keep = new Set(result.seenExternalIds);
@@ -65,7 +77,7 @@ export async function runCollection(sourceId: string): Promise<string> {
         const stale = current.filter((d) => !d.externalId || !keep.has(d.externalId)).map((d) => d.id);
         if (stale.length > 0) {
           const r = await deleteDocuments(stale);
-          itemsDeleted = r.documents;
+          itemsDeleted += r.documents;
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -75,7 +87,7 @@ export async function runCollection(sourceId: string): Promise<string> {
 
     const status = errors.length > 0
       ? (result.items.length > 0 ? 'PARTIAL' : 'FAILED')
-      : 'SUCCESS';
+      : result.continuation ? 'PARTIAL' : 'SUCCESS';
 
     await prisma.collectionRun.update({
       where: { id: run.id },
@@ -93,8 +105,15 @@ export async function runCollection(sourceId: string): Promise<string> {
     await prisma.collectorSource.update({
       where: { id: sourceId },
       data: {
-        lastRunAt: new Date(),
+        // A multi-run sync must not skip changes made while earlier pages were being indexed.
+        lastRunAt: result.syncStartedAt ? new Date(result.syncStartedAt) : new Date(),
         lastStatus: status as 'SUCCESS' | 'PARTIAL' | 'FAILED',
+        ...(errors.length === 0 && result.continuation !== undefined ? {
+          config: {
+            ...(source.config as Prisma.JsonObject),
+            _baaldaContinuation: result.continuation ? { ...result.continuation } : null,
+          },
+        } : {}),
       },
     });
 

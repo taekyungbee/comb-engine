@@ -1,6 +1,7 @@
 import type { CollectorSource } from '@prisma/client';
 import { BaseCollector } from './base-collector';
 import type { CollectedItem, CollectorResult, BaaldaConfig } from './types';
+import { resolveBaaldaConnection } from './baalda-config';
 
 /**
  * Baalda Collector — baalda(노트 앱) MCP 엔드포인트에서 노트를 읽어 수집 (LAZ-780, PLAN.md Phase 5)
@@ -16,11 +17,9 @@ import type { CollectedItem, CollectorResult, BaaldaConfig } from './types';
  *   cutoff = config.since > source.lastRunAt(직전 run 이 SUCCESS 일 때, 10분 여유) > 없으면 전체.
  * 전체 동기화일 때는 seenExternalIds 를 돌려줘 collection.service 가 사라진 노트의 문서를 지운다.
  *
- * config 예시: { "vaultIds": ["7e7e…"], "tokenEnv": "BAALDA_MCP_TOKEN" }
+ * config 예시: { "vaultIds": ["7e7e…"] }. 접속 설정은 서버 허용 목록 + ADMIN 전용.
  */
 
-const DEFAULT_MCP_URL = 'https://baalda.lazyb.xyz/api/mcp';
-const DEFAULT_TOKEN_ENV = 'BAALDA_MCP_TOKEN';
 const DEFAULT_MAX_NOTES = 2000;
 const INCREMENTAL_MARGIN_MS = 10 * 60 * 1000;
 
@@ -43,34 +42,21 @@ interface McpReadNote {
   revision?: string;
 }
 
-interface RunOutput {
-  items: CollectedItem[];
-  seen: string[];
-  full: boolean;
-  truncated: boolean;
-}
-
 export class BaaldaCollector extends BaseCollector {
   readonly type = 'BAALDA' as const;
   private seq = 0;
 
   validate(config: unknown): boolean {
+    if (config !== null && config !== undefined && (typeof config !== 'object' || Array.isArray(config))) return false;
     const c = (config ?? {}) as BaaldaConfig;
-    if (c.vaultIds !== undefined && !Array.isArray(c.vaultIds)) return false;
-    if (c.mcpUrl !== undefined && !/^https?:\/\//.test(c.mcpUrl)) return false;
-    return true;
+    if (c.vaultIds !== undefined && (!Array.isArray(c.vaultIds) || c.vaultIds.some((id) => typeof id !== 'string'))) return false;
+    if (c.maxNotes !== undefined && (!Number.isSafeInteger(c.maxNotes) || c.maxNotes < 1)) return false;
+    try { resolveBaaldaConnection(c); return true; } catch { return false; }
   }
 
   async collect(source: CollectorSource): Promise<CollectorResult> {
     try {
-      const out = await this.run(source);
-      return {
-        items: out.items,
-        errors: out.truncated ? [`maxNotes 초과로 일부 노트를 읽지 않음 (다음 run 에서 이어서 수집)`] : [],
-        // 전체 동기화가 끝까지 됐을 때만 삭제 정리 대상 목록을 넘긴다
-        fullSync: out.full && !out.truncated,
-        seenExternalIds: out.full && !out.truncated ? out.seen : undefined,
-      };
+      return await this.run(source);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[${this.type}] Collection failed for ${source.name}:`, message);
@@ -82,38 +68,50 @@ export class BaaldaCollector extends BaseCollector {
     return (await this.run(source)).items;
   }
 
-  private async run(source: CollectorSource): Promise<RunOutput> {
+  private async run(source: CollectorSource): Promise<CollectorResult> {
     const cfg = (source.config ?? {}) as BaaldaConfig;
-    const tokenEnv = cfg.tokenEnv ?? DEFAULT_TOKEN_ENV;
+    if (!this.validate(cfg)) throw new Error('Invalid Baalda collector config');
+    // Validate the pair BEFORE reading any environment secret or sending any request.
+    const { tokenEnv, mcpUrl } = resolveBaaldaConnection(cfg);
     const token = process.env[tokenEnv];
     if (!token) throw new Error(`baalda MCP 토큰 환경변수 ${tokenEnv} 가 비어 있습니다`);
-    const mcpUrl = cfg.mcpUrl ?? DEFAULT_MCP_URL;
     const maxNotes = cfg.maxNotes ?? DEFAULT_MAX_NOTES;
-    const cutoff = resolveCutoff(source, cfg);
+    const cursor = cfg._baaldaContinuation;
+    const startedAt = cursor?.startedAt ?? new Date().toISOString();
+    const cutoff = cursor ? (cursor.cutoff ? new Date(cursor.cutoff) : null) : resolveCutoff(source, cfg);
 
     const vaults = await this.call<McpVault[]>(mcpUrl, token, 'list_vaults', {});
-    const targets = cfg.vaultIds?.length
+    const targets = (cfg.vaultIds?.length
       ? vaults.filter((v) => cfg.vaultIds!.includes(v.vaultId))
-      : vaults;
+      : vaults).sort((a, b) => a.vaultId < b.vaultId ? -1 : a.vaultId > b.vaultId ? 1 : 0);
     if (targets.length === 0) throw new Error('수집 대상 vault 가 없습니다 (vaultIds 확인)');
 
     const items: CollectedItem[] = [];
     const seen: string[] = [];
+    const deletedExternalIds: string[] = [];
     let read = 0;
     let truncated = false;
+    let afterVaultId = cursor?.afterVaultId ?? '';
+    let afterDocId = cursor?.afterDocId ?? '';
 
     for (const vault of targets) {
-      const notes = await this.call<McpNote[]>(mcpUrl, token, 'list_notes', { vaultId: vault.vaultId });
+      const notes = (await this.call<McpNote[]>(mcpUrl, token, 'list_notes', { vaultId: vault.vaultId }))
+        .sort((a, b) => a.docId < b.docId ? -1 : a.docId > b.docId ? 1 : 0);
       let changed = 0;
       for (const n of notes) {
         seen.push(n.docId);
+        if (cursor && (vault.vaultId < cursor.afterVaultId ||
+          (vault.vaultId === cursor.afterVaultId && n.docId <= cursor.afterDocId))) continue;
         if (cutoff && new Date(n.updatedAt).getTime() <= cutoff.getTime()) continue;
-        if (read >= maxNotes) { truncated = true; break; }
+        // Keep enumerating for the final full-sync keep set; only note reads are bounded.
+        if (read >= maxNotes) { truncated = true; continue; }
 
         const note = await this.call<McpReadNote>(mcpUrl, token, 'read_note', { docId: n.docId });
         read++;
+        afterVaultId = vault.vaultId;
+        afterDocId = n.docId;
         const body = (note.content ?? '').trim();
-        if (!body) continue;
+        if (!body) { deletedExternalIds.push(n.docId); continue; }
 
         const relPath = n.relPath || note.relPath || '';
         const slash = relPath.lastIndexOf('/');
@@ -149,16 +147,24 @@ export class BaaldaCollector extends BaseCollector {
         `[BaaldaCollector] ${source.name} vault "${vault.name}": 노트 ${notes.length}개 중 ${changed}개 수집` +
           (cutoff ? ` (증분 기준 ${cutoff.toISOString()})` : ' (전체)'),
       );
-      if (truncated) break;
     }
 
-    return { items, seen, full: cutoff === null, truncated };
+    return {
+      items,
+      errors: [],
+      deletedExternalIds,
+      continuation: truncated ? { startedAt, cutoff: cutoff?.toISOString() ?? null, afterVaultId, afterDocId } : null,
+      syncStartedAt: startedAt,
+      fullSync: cutoff === null && !truncated,
+      seenExternalIds: cutoff === null && !truncated ? seen : undefined,
+    };
   }
 
   /** baalda MCP tools/call — structuredContent(배열은 results 로 감쌈) 우선, 없으면 content[0].text JSON */
   private async call<T>(mcpUrl: string, token: string, name: string, args: Record<string, unknown>): Promise<T> {
     const res = await this.fetchWithRetry(mcpUrl, {
       method: 'POST',
+      redirect: 'error',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

@@ -1,0 +1,15 @@
+# LAZ-794 / HON-336: PR #2 review follow-up
+
+All seven findings are addressed. This change requires no database schema change.
+
+1. Baalda validates exact MCP destination/token environment pairs before reading a token or making a request. The default pair is `https://baalda.lazyb.xyz/api/mcp` + `BAALDA_MCP_TOKEN`. Operators may add pairs through server environment variable `BAALDA_MCP_CONNECTIONS` (see `.env.example`). MEMBER source creation and updates reject `mcpUrl` and `tokenEnv`; ADMIN selections must still match the server allowlist. MCP requests reject redirects.
+2. Text ingest passes a document authorization callback to the indexer. The selected document's project and actual collection access are checked before title adoption or an external-ID update. Matching content is also checked. Title adoption without an authorization callback fails closed. Async ingest errors return the appropriate HTTP status.
+3. Bounded Baalda runs sort vault/note IDs and return a continuation cursor. The collection service stores it in the server-owned source config field `_baaldaContinuation` only after indexing and deletion succeed. A bounded page has PARTIAL status without an error; the next manual collection resumes it. Failed pages retain the previous cursor. Completing the cycle clears the cursor and uses the cycle start time as the next incremental watermark, preserving changes made during the sync. Source APIs reject client-supplied cursor state. Replacing source config without that field restarts the cycle.
+4. Empty notes emit explicit tombstones and are deleted in incremental as well as full syncs. Only a completed full cycle may prune other missing notes; its keep set includes every enumerated vault/note, including pages already processed.
+5. `reindex-full --verify --project <id>` applies the same project predicate to PostgreSQL chunks and Qdrant points. An empty project selects documents without a project. Report `points` is scoped; `collectionPoints` is the whole collection count.
+6. Document deletion removes Qdrant points by both document payload and stored chunk point IDs before PostgreSQL cascade removes the mapping. A Qdrant failure preserves the mapping for retry. `/api/embed` now writes the shared complete payload for future points.
+7. `reindex-full.ts` imports `dotenv/config` before constructing Prisma clients; `dotenv` is an explicit development dependency for this operational script.
+
+Verification: `pnpm test` (36 tests, including all three P1 regressions), `pnpm typecheck`, ESLint on the changed TypeScript files, and `pnpm build`. For a fresh checkout, the build uses the three optional DB driver stubs already defined by `Dockerfile` (`oracledb`, `pg`, `mysql2`) in ignored `node_modules`; no runtime database-driver integration is claimed. No live MCP, production database, Qdrant, reindex, infrastructure, merge, or deployment operation is part of this verification.
+
+Review owner: repository owner / Paperclip board (taekyungbee). Review the PR against `main`, especially the P1 regression tests and continuation commit boundary. Deployment approval is a separate action after code review.

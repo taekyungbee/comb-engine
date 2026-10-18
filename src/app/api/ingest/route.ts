@@ -38,10 +38,10 @@ async function handler(request: NextRequest) {
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('multipart/form-data')) {
-      return handleImageIngest(request, user.userId);
+      return await handleImageIngest(request, user.userId);
     }
 
-    return handleTextIngest(request, user.userId);
+    return await handleTextIngest(request, user.userId);
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(
@@ -58,6 +58,14 @@ async function handler(request: NextRequest) {
 }
 
 export const POST = rateLimit(handler);
+
+async function assertCollectionAccess(collectionId: string | null | undefined, userId: string) {
+  if (!collectionId) return;
+  const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
+  if (!collection || (collection.ownerId !== userId && collection.visibility === 'PRIVATE')) {
+    throw new AuthError('컬렉션에 접근할 수 없습니다.', 403);
+  }
+}
 
 async function handleTextIngest(request: NextRequest, userId: string) {
   const {
@@ -112,6 +120,11 @@ async function handleTextIngest(request: NextRequest, userId: string) {
     collectionId,
     projectId,
     adoptByTitle: adoptByTitle === true,
+  }, {
+    authorizeDocument: async (document) => {
+      if (document.projectId !== (projectId ?? null)) throw new AuthError('프로젝트에 접근할 수 없습니다.', 403);
+      await assertCollectionAccess(document.collectionId, userId);
+    },
   });
 
   return NextResponse.json({ success: true, data: { status: result, externalId } }, { status: 201 });

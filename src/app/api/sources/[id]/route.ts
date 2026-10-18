@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSource, updateSource, deleteSource } from '@/services/source.service';
 import { authenticateRequest, requireRole, AuthError } from '@/lib/api-auth';
+import { baaldaConfigInputError } from '@/collectors/baalda-config';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -45,6 +46,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = await request.json();
+    const configError = baaldaConfigInputError(body.config, user.role);
+    if (configError) throw new AuthError(configError.message, configError.status);
     const source = await updateSource(id, body);
     return NextResponse.json({ success: true, data: source });
   } catch (error) {
