@@ -14,6 +14,11 @@ export interface CollectedItem {
 export interface CollectorResult {
   items: CollectedItem[];
   errors: string[];
+  /** Explicit tombstones, also applied during incremental collection. */
+  deletedExternalIds?: string[];
+  /** Defined only by BAALDA; persisted after indexing/deletion succeeds. null clears the cursor. */
+  continuation?: BaaldaContinuation | null;
+  syncStartedAt?: string;
   /** true 면 소스의 현재 항목 전체를 훑은 결과 → seenExternalIds 에 없는 기존 문서는 삭제 대상 */
   fullSync?: boolean;
   /** fullSync 일 때 소스에 현재 존재하는 externalId 전체 */
@@ -112,10 +117,17 @@ export interface DatabaseConfig {
   includeDDL?: boolean;
 }
 
+export interface BaaldaContinuation {
+  startedAt: string;
+  cutoff: string | null;
+  afterVaultId: string;
+  afterDocId: string;
+}
+
 export interface BaaldaConfig {
-  /** MCP 엔드포인트 (기본 https://baalda.lazyb.xyz/api/mcp) */
+  /** ADMIN only; must match a server allowlisted destination/token pair. */
   mcpUrl?: string;
-  /** 토큰을 담은 환경변수 이름 (기본 BAALDA_MCP_TOKEN). 토큰 자체는 config 에 두지 않는다 */
+  /** ADMIN only; defaults to BAALDA_MCP_TOKEN. Never store the token itself. */
   tokenEnv?: string;
   /** 수집할 vault id 목록. 비우면 토큰이 닿는 vault 전부 */
   vaultIds?: string[];
@@ -125,4 +137,6 @@ export interface BaaldaConfig {
   fullSync?: boolean;
   /** 한 run 에서 읽을 최대 노트 수 (기본 2000) */
   maxNotes?: number;
+  /** Server-owned progress, not accepted by source APIs. */
+  _baaldaContinuation?: BaaldaContinuation | null;
 }

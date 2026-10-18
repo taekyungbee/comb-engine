@@ -16,6 +16,8 @@
  * 확정값(CLAUDE.md): EMBED_BATCH=100, SCROLL_BATCH=500
  */
 
+import 'dotenv/config';
+import { basename } from 'node:path';
 import { PrismaClient, type SourceType } from '@prisma/client';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { textToSparse } from '../src/lib/qdrant';
@@ -116,14 +118,20 @@ async function ensureCollection(target: string, create: boolean): Promise<void> 
 }
 
 /** 대상 컬렉션의 point id 전체 (이어하기·검증용) */
-async function loadPointIds(target: string): Promise<Set<string>> {
+async function loadPointIds(target: string, project?: string): Promise<Set<string>> {
   const ids = new Set<string>();
   let offset: string | number | undefined;
   while (true) {
-    const r = await qdrant.scroll(target, { limit: 2000, with_payload: false, with_vector: false, ...(offset ? { offset } : {}) });
+    const r = await qdrant.scroll(target, {
+      limit: 2000, with_payload: false, with_vector: false,
+      ...(offset !== undefined ? { offset } : {}),
+      ...(project !== undefined ? { filter: {
+        must: project === '' ? [{ is_empty: { key: 'project_id' } }] : [{ key: 'project_id', match: { value: project } }],
+      } } : {}),
+    });
     for (const p of r.points) ids.add(String(p.id));
     offset = r.next_page_offset as string | number | undefined;
-    if (!offset) break;
+    if (offset === undefined || offset === null) break;
   }
   return ids;
 }
@@ -137,7 +145,7 @@ interface ChunkRow {
 
 async function* iterChunks(project: string | undefined): AsyncGenerator<ChunkRow[]> {
   let cursor: string | undefined;
-  const where = project === undefined ? {} : { document: { projectId: project === '' ? null : project } };
+  const where = projectChunkWhere(project);
   while (true) {
     const rows: ChunkRow[] = await prisma.documentChunk.findMany({
       where,
@@ -158,12 +166,14 @@ async function* iterChunks(project: string | undefined): AsyncGenerator<ChunkRow
   }
 }
 
+function projectChunkWhere(project: string | undefined) {
+  return project === undefined ? {} : { document: { projectId: project === '' ? null : project } };
+}
+
 async function reindex(args: Args): Promise<void> {
   await ensureCollection(args.target, args.create);
   const existing = args.resume ? await loadPointIds(args.target) : new Set<string>();
-  const totalChunks = await prisma.documentChunk.count(
-    args.project === undefined ? undefined : { where: { document: { projectId: args.project === '' ? null : args.project } } },
-  );
+  const totalChunks = await prisma.documentChunk.count({ where: projectChunkWhere(args.project) });
   console.log(`\n=== 재색인 → ${args.target} | PG 청크 ${totalChunks.toLocaleString()}건, 이미 적재 ${existing.size.toLocaleString()}건 ===`);
 
   const perProject = new Map<string, { chunks: number; indexed: number; skipped: number }>();
@@ -213,9 +223,12 @@ async function reindex(args: Args): Promise<void> {
   await verify(args);
 }
 
-async function verify(args: Args): Promise<void> {
-  const pointIds = await loadPointIds(args.target);
-  const chunks = await prisma.documentChunk.findMany({ select: { id: true, document: { select: { projectId: true } } } });
+export async function verify(args: Args): Promise<void> {
+  const pointIds = await loadPointIds(args.target, args.project);
+  const chunks = await prisma.documentChunk.findMany({
+    where: projectChunkWhere(args.project),
+    select: { id: true, document: { select: { projectId: true } } },
+  });
   const chunkIds = new Set(chunks.map((c) => c.id));
   let matched = 0;
   const perProject: Record<string, { chunks: number; matched: number }> = {};
@@ -231,8 +244,10 @@ async function verify(args: Args): Promise<void> {
   const report = {
     collection: args.target,
     checkedAt: new Date().toISOString(),
+    project: args.project ?? '(all)',
     pgChunks: chunks.length,
-    points: info.points_count ?? pointIds.size,
+    points: pointIds.size,
+    collectionPoints: info.points_count ?? null,
     chunksWithPoint: matched,
     matchRate: chunks.length ? Number(((matched / chunks.length) * 100).toFixed(2)) : 0,
     pointsWithoutChunk: extra,
@@ -251,4 +266,6 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (/^reindex-full\.[cm]?[jt]s$/.test(basename(process.argv[1] ?? ''))) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

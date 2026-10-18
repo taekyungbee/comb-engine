@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listSources, createSource } from "@/services/source.service";
 import { authenticateRequest, requireRole, AuthError } from "@/lib/api-auth";
+import { baaldaConfigInputError } from '@/collectors/baalda-config';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,10 +39,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireRole(await authenticateRequest(request), "ADMIN", "MEMBER");
+    const user = requireRole(await authenticateRequest(request), "ADMIN", "MEMBER");
     const body = await request.json();
     const { name, type, url, config, cronExpr, enabled, tags, projectId } =
       body;
+    const configError = baaldaConfigInputError(config, user.role);
+    if (configError) throw new AuthError(configError.message, configError.status);
 
     if (!name || !type) {
       return NextResponse.json(

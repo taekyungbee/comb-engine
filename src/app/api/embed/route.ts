@@ -4,6 +4,7 @@ import { authenticateRequest, requireRole, AuthError } from '@/lib/api-auth';
 import { getEmbeddingProvider } from '@/lib/rag/embedding';
 import { getQdrantClient, getCollectionName, textToSparse } from '@/lib/qdrant';
 import { getAliasEmbeddingText } from '@/lib/rag/aliases';
+import { buildChunkPayload } from '@/lib/rag/indexer';
 import { rateLimitMiddleware } from '@/middleware/rate-limit';
 
 const rateLimit = rateLimitMiddleware({ limit: 10, windowMs: 60000 });
@@ -57,7 +58,8 @@ async function handler(request: NextRequest) {
       select: {
         id: true,
         content: true,
-        document: { select: { title: true, sourceType: true } },
+        documentId: true,
+        document: { select: { title: true, sourceType: true, projectId: true, collectionId: true, url: true } },
       },
       orderBy: { createdAt: 'asc' },
       take: Math.min(limit, 5000),
@@ -107,7 +109,6 @@ async function handler(request: NextRequest) {
       const batch = pending.slice(i, i + BATCH_SIZE);
       const texts = batch.map((c) => c.content);
       const titleMap = batch.map((c) => c.document.title);
-      const sourceTypeMap = batch.map((c) => String(c.document.sourceType));
 
       try {
         const [embeddings, aliasEmbeddings] = await Promise.all([
@@ -122,12 +123,7 @@ async function handler(request: NextRequest) {
             text: textToSparse(chunk.content),
             alias: aliasEmbeddings[j],
           },
-          payload: {
-            chunk_id: chunk.id,
-            content: chunk.content,
-            title: titleMap[j],
-            source_type: sourceTypeMap[j],
-          },
+          payload: buildChunkPayload(chunk, chunk.documentId, chunk.document.sourceType, chunk.document),
         }));
 
         await qdrant.upsert(collection, { points });
